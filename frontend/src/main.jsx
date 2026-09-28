@@ -2,10 +2,11 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
+BrowserRouter,
+Navigate,
+Route,
+Routes,
+useLocation,
 } from "react-router-dom";
 
 import "./index.css";
@@ -18,6 +19,7 @@ import Login from "./pages/Login.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import VerifyOtp from "./pages/VerifyOtp.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
+import ChangePassword from "./pages/ChangePassword.jsx";
 
 // ================================================================
 // STUDENT PAGES
@@ -73,20 +75,49 @@ import AdminReports from "./pages/AdminReports.jsx";
 import AdminAttendance from "./pages/AdminAttendance.jsx";
 import AdminResults from "./pages/AdminResults.jsx";
 
-import { getLoggedInUser } from "./api";
+import {
+getLoggedInUser,
+} from "./api";
 
 // ================================================================
 // AUTHENTICATION HELPERS
 // ================================================================
 
+const getUser = () => {
+return getLoggedInUser();
+};
+
 const getRole = () => {
-  const user = getLoggedInUser();
+const user = getUser();
 
-  if (!user?.role) {
-    return null;
-  }
+if (!user?.role) {
+return null;
+}
 
-  return String(user.role).toUpperCase();
+return String(
+user.role
+).toUpperCase();
+};
+
+// ================================================================
+// DEFAULT DASHBOARD BY ROLE
+// ================================================================
+
+const getDashboardPath = (
+role
+) => {
+if (role === "ADMIN") {
+return "/admin/dashboard";
+}
+
+if (
+role === "FACULTY" ||
+role === "TEACHER"
+) {
+return "/faculty/dashboard";
+}
+
+return "/dashboard";
 };
 
 // ================================================================
@@ -94,63 +125,95 @@ const getRole = () => {
 // ================================================================
 
 const ProtectedRoute = ({
-  children,
-  allowedRoles = [],
+children,
+allowedRoles = [],
 }) => {
-  const token = localStorage.getItem("token");
-  const role = getRole();
+const location = useLocation();
 
-  // --------------------------------------------------------------
-  // NOT LOGGED IN
-  // --------------------------------------------------------------
+const token =
+localStorage.getItem("token");
 
-  if (!token) {
-    return (
-      <Navigate
-        to="/"
-        replace
-      />
-    );
-  }
+const user = getUser();
 
-  // --------------------------------------------------------------
-  // LOGGED IN BUT WRONG ROLE
-  // --------------------------------------------------------------
+const role = getRole();
 
-  if (
-    allowedRoles.length > 0 &&
-    !allowedRoles.includes(role)
-  ) {
-    if (role === "ADMIN") {
-      return (
-        <Navigate
-          to="/admin/dashboard"
-          replace
-        />
-      );
-    }
+// --------------------------------------------------------------
+// NOT LOGGED IN
+// --------------------------------------------------------------
 
-    if (
-      role === "FACULTY" ||
-      role === "TEACHER"
-    ) {
-      return (
-        <Navigate
-          to="/faculty/dashboard"
-          replace
-        />
-      );
-    }
+if (!token) {
+return ( <Navigate
+     to="/"
+     replace
+   />
+);
+}
 
-    return (
-      <Navigate
-        to="/dashboard"
-        replace
-      />
-    );
-  }
+// --------------------------------------------------------------
+// FIRST LOGIN PASSWORD CHANGE
+// --------------------------------------------------------------
 
-  return children;
+if (
+user?.mustChangePassword === true &&
+location.pathname !== "/change-password"
+) {
+return ( <Navigate
+     to="/change-password"
+     replace
+   />
+);
+}
+
+// --------------------------------------------------------------
+// LOGGED IN BUT WRONG ROLE
+// --------------------------------------------------------------
+
+if (
+allowedRoles.length > 0 &&
+!allowedRoles.includes(role)
+) {
+return ( <Navigate
+     to={getDashboardPath(role)}
+     replace
+   />
+);
+}
+
+return children;
+};
+
+// ================================================================
+// CHANGE PASSWORD ROUTE GUARD
+// ================================================================
+
+const ChangePasswordRoute = () => {
+const token =
+localStorage.getItem("token");
+
+const user = getUser();
+
+if (!token) {
+return ( <Navigate
+     to="/"
+     replace
+   />
+);
+}
+
+if (
+user?.mustChangePassword !== true
+) {
+return (
+<Navigate
+to={getDashboardPath(
+getRole()
+)}
+replace
+/>
+);
+}
+
+return <ChangePassword />;
 };
 
 // ================================================================
@@ -158,595 +221,530 @@ const ProtectedRoute = ({
 // ================================================================
 
 const App = () => {
-  return (
-    <Routes>
+return ( <Routes>
 
-      {/* ==========================================================
-          AUTHENTICATION
-      ========================================================== */}
 
-      <Route
-        path="/"
-        element={<Login />}
+  {/* ==========================================================
+      AUTHENTICATION
+  ========================================================== */}
+
+  <Route
+    path="/"
+    element={<Login />}
+  />
+
+  <Route
+    path="/forgot-password"
+    element={<ForgotPassword />}
+  />
+
+  <Route
+    path="/verify-otp"
+    element={<VerifyOtp />}
+  />
+
+  <Route
+    path="/reset-password"
+    element={<ResetPassword />}
+  />
+
+  <Route
+    path="/change-password"
+    element={<ChangePasswordRoute />}
+  />
+
+  {/* ==========================================================
+      STUDENT ROUTES
+  ========================================================== */}
+
+  <Route
+    path="/dashboard"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Dashboard />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/courses"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Courses />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/attendance"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Attendance />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/timetable"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Timetable />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/assignments"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Assignments />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/examinations"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Examinations />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/results"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Results />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/fees"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Fees />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/notices"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Notices />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/settings"
+    element={
+      <ProtectedRoute
+        allowedRoles={["STUDENT"]}
+      >
+        <Settings />
+      </ProtectedRoute>
+    }
+  />
+
+  {/* ==========================================================
+      FACULTY ROUTES
+  ========================================================== */}
+
+  <Route
+    path="/faculty/dashboard"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyDashboard />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/courses"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyCourses />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/courses/:id"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyCourseDetails />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/attendance"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyAttendance />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/assignments"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyAssignments />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/assignments/:id"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyAssignmentDetails />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/examinations"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyExaminations />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/examinations/:id"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyExamResults />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/students"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyStudents />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/timetable"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyTimetable />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/faculty/notices"
+    element={
+      <ProtectedRoute
+        allowedRoles={[
+          "FACULTY",
+          "TEACHER",
+        ]}
+      >
+        <FacultyNotices />
+      </ProtectedRoute>
+    }
+  />
+
+  {/* ==========================================================
+      ADMIN ROUTES
+  ========================================================== */}
+
+  <Route
+    path="/admin/dashboard"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminDashboard />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/students"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminStudents />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/faculty"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminFaculty />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/departments"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminDepartments />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/programs"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminPrograms />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/academic-years"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminAcademicYears />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/fee-structures"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminFeeStructures />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/courses"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminCourses />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/enrollments"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminEnrollments />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/fees"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminFees />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/exams"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminExams />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/assignments"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminAssignments />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/timetable"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminTimetable />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/notices"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminNotices />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/users"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminUsers />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/reports"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminReports />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/attendance"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminAttendance />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/admin/results"
+    element={
+      <ProtectedRoute
+        allowedRoles={["ADMIN"]}
+      >
+        <AdminResults />
+      </ProtectedRoute>
+    }
+  />
+
+  {/* ==========================================================
+      FALLBACK
+  ========================================================== */}
+
+  <Route
+    path="*"
+    element={
+      <Navigate
+        to="/"
+        replace
       />
+    }
+  />
 
-      <Route
-        path="/forgot-password"
-        element={<ForgotPassword />}
-      />
+</Routes>
 
-      <Route
-        path="/verify-otp"
-        element={<VerifyOtp />}
-      />
 
-      <Route
-        path="/reset-password"
-        element={<ResetPassword />}
-      />
-
-      {/* ==========================================================
-          STUDENT ROUTES
-      ========================================================== */}
-
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/courses"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Courses />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/attendance"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Attendance />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/timetable"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Timetable />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/assignments"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Assignments />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/examinations"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Examinations />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/results"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Results />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/fees"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Fees />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/notices"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Notices />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute
-            allowedRoles={["STUDENT"]}
-          >
-            <Settings />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ==========================================================
-          FACULTY ROUTES
-      ========================================================== */}
-
-      <Route
-        path="/faculty/dashboard"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/courses"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyCourses />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/courses/:id"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyCourseDetails />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/attendance"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyAttendance />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/assignments"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyAssignments />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/assignments/:id"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyAssignmentDetails />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/examinations"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyExaminations />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/examinations/:id"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyExamResults />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/students"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyStudents />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/timetable"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyTimetable />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/faculty/notices"
-        element={
-          <ProtectedRoute
-            allowedRoles={[
-              "FACULTY",
-              "TEACHER",
-            ]}
-          >
-            <FacultyNotices />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ==========================================================
-          ADMIN ROUTES
-      ========================================================== */}
-
-      {/* ----------------------------------------------------------
-          ADMIN DASHBOARD
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/dashboard"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminDashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN STUDENTS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/students"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminStudents />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN FACULTY
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/faculty"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminFaculty />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN DEPARTMENTS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/departments"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminDepartments />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN PROGRAMS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/programs"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminPrograms />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN ACADEMIC YEARS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/academic-years"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminAcademicYears />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN FEE STRUCTURES
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/fee-structures"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminFeeStructures />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN COURSES
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/courses"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminCourses />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN ENROLLMENTS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/enrollments"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminEnrollments />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN FEES
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/fees"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminFees />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN EXAMS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/exams"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminExams />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN ASSIGNMENTS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/assignments"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminAssignments />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN TIMETABLE
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/timetable"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminTimetable />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN NOTICES
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/notices"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminNotices />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN USERS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/users"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminUsers />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN REPORTS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/reports"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminReports />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN ATTENDANCE
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/attendance"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminAttendance />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ----------------------------------------------------------
-          ADMIN RESULTS
-      ---------------------------------------------------------- */}
-
-      <Route
-        path="/admin/results"
-        element={
-          <ProtectedRoute
-            allowedRoles={["ADMIN"]}
-          >
-            <AdminResults />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ==========================================================
-          FALLBACK
-      ========================================================== */}
-
-      <Route
-        path="*"
-        element={
-          <Navigate
-            to="/"
-            replace
-          />
-        }
-      />
-
-    </Routes>
-  );
+);
 };
 
 // ================================================================
@@ -754,11 +752,8 @@ const App = () => {
 // ================================================================
 
 ReactDOM.createRoot(
-  document.getElementById("root")
+document.getElementById("root")
 ).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
+<React.StrictMode> <BrowserRouter> <App /> </BrowserRouter>
+</React.StrictMode>
 );

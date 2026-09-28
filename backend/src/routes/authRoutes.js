@@ -6,40 +6,23 @@ import {
   forgotPassword,
   verifyResetOtp,
   resetPassword,
+  changePassword,
 } from "../controllers/authController.js";
 
 import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-/*
-|--------------------------------------------------------------------------
-| Public Authentication Routes
-|--------------------------------------------------------------------------
-*/
-
-// Register
 router.post("/register", registerUser);
 
-// Login
 router.post("/login", loginUser);
 
-// Forgot Password
 router.post("/forgot-password", forgotPassword);
 
-// Verify Password Reset OTP
 router.post("/verify-reset-otp", verifyResetOtp);
 
-// Reset Password
 router.post("/reset-password", resetPassword);
 
-/*
-|--------------------------------------------------------------------------
-| Protected Authentication Routes
-|--------------------------------------------------------------------------
-*/
-
-// Current logged-in user
 router.get("/me", authMiddleware, (req, res) => {
   res.json({
     success: true,
@@ -47,5 +30,11 @@ router.get("/me", authMiddleware, (req, res) => {
     user: req.user,
   });
 });
+
+router.post(
+  "/change-password",
+  authMiddleware,
+  changePassword
+);
 
 export default router;

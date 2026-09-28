@@ -418,6 +418,7 @@ export const changeStudentPassword = async (req, res) => {
       },
       data: {
         passwordHash: newPasswordHash,
+        mustChangePassword: false,
       },
     });
 
@@ -437,17 +438,306 @@ export const changeStudentPassword = async (req, res) => {
 
 // ============================================================
 // FACULTY STUDENTS
+// GET /api/student/faculty/students
 // ============================================================
 
 export const getFacultyStudents = async (req, res) => {
   try {
-    // KEEP YOUR EXISTING getFacultyStudents CODE HERE
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authentication data",
+      });
+    }
+
+    // --------------------------------------------------------
+    // Find logged-in faculty
+    // --------------------------------------------------------
+
+    const faculty = await prisma.faculty.findUnique({
+      where: {
+        userId: Number(userId),
+      },
+      select: {
+        id: true,
+        employeeId: true,
+        designation: true,
+
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!faculty) {
+      return res.status(403).json({
+        success: false,
+        message: "Faculty profile not found",
+      });
+    }
+
+    // --------------------------------------------------------
+    // Find courses assigned to this faculty
+    // --------------------------------------------------------
+
+    const courses = await prisma.course.findMany({
+      where: {
+        facultyId: faculty.id,
+      },
+
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        credits: true,
+        semester: true,
+      },
+
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    const courseIds = courses.map((course) => course.id);
+
+    // --------------------------------------------------------
+    // No assigned courses
+    // --------------------------------------------------------
+
+    if (courseIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+
+        faculty: {
+          id: faculty.id,
+          employeeId: faculty.employeeId,
+          designation: faculty.designation,
+          user: faculty.user,
+        },
+
+        courses: [],
+        students: [],
+      });
+    }
+
+    // --------------------------------------------------------
+    // Get students enrolled in faculty courses
+    // --------------------------------------------------------
+
+    const enrollments = await prisma.courseEnrollment.findMany({
+      where: {
+        courseId: {
+          in: courseIds,
+        },
+      },
+
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                isActive: true,
+              },
+            },
+
+            departmentRel: true,
+            programRel: true,
+          },
+        },
+
+        course: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            credits: true,
+            semester: true,
+          },
+        },
+      },
+
+      orderBy: {
+        studentId: "asc",
+      },
+    });
+
+    // --------------------------------------------------------
+    // Group courses for each student
+    // --------------------------------------------------------
+
+    const studentMap = new Map();
+
+    for (const enrollment of enrollments) {
+      const student = enrollment.student;
+
+      if (!studentMap.has(student.id)) {
+        studentMap.set(student.id, {
+          id: student.id,
+
+          enrollmentNumber: student.enrollmentNumber,
+
+          semester: student.semester,
+
+          admissionYear: student.admissionYear,
+
+          phone: student.phone,
+
+          dateOfBirth: student.dateOfBirth,
+
+          batch: student.batch,
+
+          division: student.division,
+
+          user: student.user,
+
+          department: student.departmentRel,
+
+          departmentRel: student.departmentRel,
+
+          program: student.programRel,
+
+          programRel: student.programRel,
+
+          courses: [],
+        });
+      }
+
+      const studentData = studentMap.get(student.id);
+
+      studentData.courses.push(enrollment.course);
+    }
+
+    const students = Array.from(studentMap.values());
+
+    // --------------------------------------------------------
+    // Return response
+    // --------------------------------------------------------
+
+    return res.status(200).json({
+      success: true,
+
+      faculty: {
+        id: faculty.id,
+        employeeId: faculty.employeeId,
+        designation: faculty.designation,
+        user: faculty.user,
+      },
+
+      courses,
+
+      students,
+    });
   } catch (error) {
     console.error("Get faculty students error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Failed to fetch faculty students",
+      error: error.message,
+      code: error.code || null,
+    });
+  }
+};
+
+// ============================================================
+// STUDENT RESULTS
+// GET /api/student/results
+// ============================================================
+
+export const getMyResults = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authentication data",
+      });
+    }
+
+    // --------------------------------------------------------
+    // Find logged-in student
+    // --------------------------------------------------------
+
+    const student = await prisma.student.findUnique({
+      where: {
+        userId: Number(userId),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student profile not found",
+      });
+    }
+
+    // --------------------------------------------------------
+    // Get student's results
+    // --------------------------------------------------------
+
+    const results = await prisma.examResult.findMany({
+      where: {
+        studentId: student.id,
+      },
+
+      include: {
+        exam: {
+          select: {
+            id: true,
+            title: true,
+            examType: true,
+            examDate: true,
+            maxMarks: true,
+          },
+        },
+
+        course: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            credits: true,
+            semester: true,
+            type: true,
+          },
+        },
+      },
+
+      orderBy: {
+        id: "desc",
+      },
+    });
+
+    // --------------------------------------------------------
+    // Return results
+    // --------------------------------------------------------
+
+    return res.status(200).json({
+      success: true,
+      count: results.length,
+      results,
+    });
+  } catch (error) {
+    console.error("Get student results error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch student results",
     });
   }
 };
@@ -462,4 +752,5 @@ export default {
   updateStudentProfile,
   changeStudentPassword,
   getFacultyStudents,
+  getMyResults,
 };

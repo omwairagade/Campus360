@@ -6,6 +6,7 @@ import {
   updateStudentProfile,
   changeStudentPassword,
   getFacultyStudents,
+  getMyResults,
 } from "../controllers/studentController.js";
 
 import authMiddleware from "../middleware/authMiddleware.js";
@@ -55,6 +56,16 @@ router.post(
   "/change-password",
   authMiddleware,
   changeStudentPassword
+);
+
+// ============================================================
+// STUDENT RESULTS
+// ============================================================
+
+router.get(
+  "/results",
+  authMiddleware,
+  getMyResults
 );
 
 export default router;

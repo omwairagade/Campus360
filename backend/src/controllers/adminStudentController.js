@@ -32,8 +32,7 @@ const COLLEGE_EMAIL_DOMAIN = (
 // ============================================================
 
 const STUDENT_ENROLLMENT_PREFIX =
-  process.env.STUDENT_ENROLLMENT_PREFIX ||
-  "2235801";
+  process.env.STUDENT_ENROLLMENT_PREFIX || "2235801";
 
 const STUDENT_ENROLLMENT_SEQUENCE_LENGTH = 4;
 
@@ -56,8 +55,7 @@ const generateNextEnrollmentNumber = async (
     await transaction.student.findMany({
       where: {
         enrollmentNumber: {
-          startsWith:
-            STUDENT_ENROLLMENT_PREFIX,
+          startsWith: STUDENT_ENROLLMENT_PREFIX,
         },
       },
 
@@ -70,9 +68,7 @@ const generateNextEnrollmentNumber = async (
 
   for (const student of students) {
     const enrollmentNumber =
-      String(
-        student.enrollmentNumber || ""
-      ).trim();
+      String(student.enrollmentNumber || "").trim();
 
     if (
       !enrollmentNumber.startsWith(
@@ -87,14 +83,11 @@ const generateNextEnrollmentNumber = async (
         STUDENT_ENROLLMENT_PREFIX.length
       );
 
-    if (
-      !/^\d+$/.test(sequencePart)
-    ) {
+    if (!/^\d+$/.test(sequencePart)) {
       continue;
     }
 
-    const sequence =
-      Number(sequencePart);
+    const sequence = Number(sequencePart);
 
     if (
       Number.isInteger(sequence) &&
@@ -104,18 +97,12 @@ const generateNextEnrollmentNumber = async (
     }
   }
 
-  const nextSequence =
-    highestSequence + 1;
+  const nextSequence = highestSequence + 1;
 
   const maximumSequence =
-    10 **
-      STUDENT_ENROLLMENT_SEQUENCE_LENGTH -
-    1;
+    10 ** STUDENT_ENROLLMENT_SEQUENCE_LENGTH - 1;
 
-  if (
-    nextSequence >
-    maximumSequence
-  ) {
+  if (nextSequence > maximumSequence) {
     throw new Error(
       "Student enrollment number limit has been reached."
     );
@@ -127,7 +114,10 @@ const generateNextEnrollmentNumber = async (
       "0"
     );
 
-  return `${STUDENT_ENROLLMENT_PREFIX}${sequenceString}`;
+  return (
+    STUDENT_ENROLLMENT_PREFIX +
+    sequenceString
+  );
 };
 
 // ============================================================
@@ -145,7 +135,9 @@ const generateUniqueCollegeEmail = async (
       .replace(/[^a-z0-9]/g, "");
 
   let email =
-    `${cleanEnrollmentNumber}@${COLLEGE_EMAIL_DOMAIN}`;
+    cleanEnrollmentNumber +
+    "@" +
+    COLLEGE_EMAIL_DOMAIN;
 
   const existingUser =
     await transaction.user.findUnique({
@@ -166,7 +158,10 @@ const generateUniqueCollegeEmail = async (
 
   while (true) {
     email =
-      `${cleanEnrollmentNumber}${counter}@${COLLEGE_EMAIL_DOMAIN}`;
+      cleanEnrollmentNumber +
+      counter +
+      "@" +
+      COLLEGE_EMAIL_DOMAIN;
 
     const existing =
       await transaction.user.findUnique({
@@ -192,537 +187,542 @@ const generateUniqueCollegeEmail = async (
    POST /api/admin/students
    ========================================================= */
 
-export const createAdminStudent =
-  async (req, res) => {
-    try {
-      const {
-        firstName,
-        lastName,
-        semester,
-        admissionYear,
-        phone,
-        dateOfBirth,
-        batch,
-        division,
-        departmentId,
-        programId,
-      } = req.body;
-
-      // ------------------------------------------------------
-      // REQUIRED FIELDS
-      // ------------------------------------------------------
-
-      if (
-        !firstName ||
-        !lastName ||
-        semester === undefined ||
-        semester === null ||
-        admissionYear === undefined ||
-        admissionYear === null ||
-        !departmentId ||
-        !programId
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "First name, last name, semester, admission year, department and program are required.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // NORMALIZE BASIC DATA
-      // ------------------------------------------------------
-
-      const normalizedFirstName =
-        String(firstName).trim();
-
-      const normalizedLastName =
-        String(lastName).trim();
-
-      const normalizedBatch =
-        batch !== undefined &&
-        batch !== null &&
-        String(batch).trim() !== ""
-          ? String(batch).trim()
-          : null;
-
-      const normalizedDivision =
-        division !== undefined &&
-        division !== null &&
-        String(division).trim() !== ""
-          ? String(division)
-              .trim()
-              .toUpperCase()
-          : null;
-
-      const normalizedPhone =
-        phone !== undefined &&
-        phone !== null &&
-        String(phone).trim() !== ""
-          ? String(phone).trim()
-          : null;
-
-      // ------------------------------------------------------
-      // VALIDATE NAMES
-      // ------------------------------------------------------
-
-      if (
-        normalizedFirstName.length < 2 ||
-        normalizedLastName.length < 2
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "First name and last name must contain at least 2 characters.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // VALIDATE SEMESTER
-      // ------------------------------------------------------
-
-      const normalizedSemester =
-        Number(semester);
-
-      if (
-        !Number.isInteger(
-          normalizedSemester
-        ) ||
-        normalizedSemester < 1 ||
-        normalizedSemester > 12
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Semester must be a valid number between 1 and 12.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // VALIDATE ADMISSION YEAR
-      // ------------------------------------------------------
-
-      const normalizedAdmissionYear =
-        Number(admissionYear);
-
-      if (
-        !Number.isInteger(
-          normalizedAdmissionYear
-        ) ||
-        normalizedAdmissionYear < 2000 ||
-        normalizedAdmissionYear > 2100
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Admission year is invalid.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // VALIDATE DEPARTMENT ID
-      // ------------------------------------------------------
-
-      const normalizedDepartmentId =
-        Number(departmentId);
-
-      if (
-        !Number.isInteger(
-          normalizedDepartmentId
-        ) ||
-        normalizedDepartmentId <= 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Invalid department ID.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // VALIDATE PROGRAM ID
-      // ------------------------------------------------------
-
-      const normalizedProgramId =
-        Number(programId);
-
-      if (
-        !Number.isInteger(
-          normalizedProgramId
-        ) ||
-        normalizedProgramId <= 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Invalid program ID.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // VALIDATE BATCH
-      // ------------------------------------------------------
-
-      if (
-        normalizedBatch &&
-        !/^[A-Za-z0-9]+$/.test(
-          normalizedBatch
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Batch can contain only letters and numbers.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // VALIDATE DIVISION
-      // ------------------------------------------------------
-
-      if (
-        normalizedDivision &&
-        !/^[A-Za-z0-9]+$/.test(
-          normalizedDivision
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Division can contain only letters and numbers.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // VALIDATE PHONE
-      // ------------------------------------------------------
-
-      if (
-        normalizedPhone &&
-        !/^[0-9+\-\s()]{7,20}$/.test(
-          normalizedPhone
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Invalid phone number.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // VALIDATE DATE OF BIRTH
-      // ------------------------------------------------------
-
-      let normalizedDateOfBirth = null;
-
-      if (
-        dateOfBirth !== undefined &&
-        dateOfBirth !== null &&
-        String(dateOfBirth).trim() !== ""
-      ) {
-        const parsedDate =
-          new Date(dateOfBirth);
-
-        if (
-          Number.isNaN(
-            parsedDate.getTime()
-          )
-        ) {
-          return res.status(400).json({
-            success: false,
-            message:
-              "Invalid date of birth.",
-          });
-        }
-
-        normalizedDateOfBirth =
-          parsedDate;
-      }
-
-      // ------------------------------------------------------
-      // CHECK DEPARTMENT
-      // ------------------------------------------------------
-
-      const department =
-        await prisma.department.findUnique({
-          where: {
-            id: normalizedDepartmentId,
-          },
-
-          select: {
-            id: true,
-            name: true,
-            code: true,
-          },
-        });
-
-      if (!department) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Department not found.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // CHECK PROGRAM
-      // ------------------------------------------------------
-
-      const program =
-        await prisma.program.findUnique({
-          where: {
-            id: normalizedProgramId,
-          },
-
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            departmentId: true,
-          },
-        });
-
-      if (!program) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Program not found.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // ENSURE PROGRAM BELONGS TO DEPARTMENT
-      // ------------------------------------------------------
-
-      if (
-        program.departmentId !==
-        normalizedDepartmentId
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Selected program does not belong to the selected department.",
-        });
-      }
-
-      // ------------------------------------------------------
-      // CREATE USER + STUDENT
-      // ------------------------------------------------------
-
-      const result =
-        await prisma.$transaction(
-          async (transaction) => {
-            // ----------------------------------------------
-            // GENERATE ENROLLMENT NUMBER
-            // ----------------------------------------------
-
-            const enrollmentNumber =
-              await generateNextEnrollmentNumber(
-                transaction
-              );
-
-            // ----------------------------------------------
-            // GENERATE COLLEGE EMAIL
-            // ----------------------------------------------
-
-            const collegeEmail =
-              await generateUniqueCollegeEmail(
-                enrollmentNumber,
-                transaction
-              );
-
-            // ----------------------------------------------
-            // GENERATE TEMPORARY PASSWORD
-            // ----------------------------------------------
-
-            const temporaryPassword =
-              generateTemporaryPassword();
-
-            const passwordHash =
-              await bcrypt.hash(
-                temporaryPassword,
-                10
-              );
-
-            // ----------------------------------------------
-            // CREATE USER
-            // ----------------------------------------------
-
-            const user =
-              await transaction.user.create({
-                data: {
-                  firstName:
-                    normalizedFirstName,
-
-                  lastName:
-                    normalizedLastName,
-
-                  email:
-                    collegeEmail,
-
-                  passwordHash,
-
-                  role: "STUDENT",
-
-                  isActive: true,
-                },
-
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  role: true,
-                  isActive: true,
-                  createdAt: true,
-                },
-              });
-
-            // ----------------------------------------------
-            // CREATE STUDENT
-            // ----------------------------------------------
-
-            const student =
-              await transaction.student.create({
-                data: {
-                  userId: user.id,
-
-                  enrollmentNumber,
-
-                  semester:
-                    normalizedSemester,
-
-                  admissionYear:
-                    normalizedAdmissionYear,
-
-                  phone:
-                    normalizedPhone,
-
-                  dateOfBirth:
-                    normalizedDateOfBirth,
-
-                  batch:
-                    normalizedBatch,
-
-                  division:
-                    normalizedDivision,
-
-                  departmentId:
-                    normalizedDepartmentId,
-
-                  programId:
-                    normalizedProgramId,
-                },
-
-                select: {
-                  id: true,
-                  enrollmentNumber: true,
-                  semester: true,
-                  admissionYear: true,
-                  phone: true,
-                  dateOfBirth: true,
-                  batch: true,
-                  division: true,
-                  departmentId: true,
-                  programId: true,
-                },
-              });
-
-            return {
-              user,
-              student,
-              temporaryPassword,
-            };
-          }
-        );
-
-      // ------------------------------------------------------
-      // RESPONSE
-      // ------------------------------------------------------
-
-      return res.status(201).json({
-        success: true,
-
+export const createAdminStudent = async (
+  req,
+  res
+) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      semester,
+      admissionYear,
+      phone,
+      dateOfBirth,
+      batch,
+      division,
+      departmentId,
+      programId,
+    } = req.body;
+
+    // ------------------------------------------------------
+    // REQUIRED FIELDS
+    // ------------------------------------------------------
+
+    if (
+      !firstName ||
+      !lastName ||
+      semester === undefined ||
+      semester === null ||
+      admissionYear === undefined ||
+      admissionYear === null ||
+      !departmentId ||
+      !programId
+    ) {
+      return res.status(400).json({
+        success: false,
         message:
-          "Student account created successfully.",
+          "First name, last name, semester, admission year, department and program are required.",
+      });
+    }
 
-        data: {
-          student:
-            result.student,
+    // ------------------------------------------------------
+    // NORMALIZE BASIC DATA
+    // ------------------------------------------------------
 
-          user:
-            result.user,
+    const normalizedFirstName =
+      String(firstName).trim();
 
-          credentials: {
-            enrollmentNumber:
-              result.student
-                .enrollmentNumber,
+    const normalizedLastName =
+      String(lastName).trim();
 
-            email:
-              result.user.email,
+    const normalizedBatch =
+      batch !== undefined &&
+      batch !== null &&
+      String(batch).trim() !== ""
+        ? String(batch).trim()
+        : null;
 
-            temporaryPassword:
-              result.temporaryPassword,
-          },
+    const normalizedDivision =
+      division !== undefined &&
+      division !== null &&
+      String(division).trim() !== ""
+        ? String(division)
+            .trim()
+            .toUpperCase()
+        : null;
 
-          department: {
-            id:
-              department.id,
+    const normalizedPhone =
+      phone !== undefined &&
+      phone !== null &&
+      String(phone).trim() !== ""
+        ? String(phone).trim()
+        : null;
 
-            name:
-              department.name,
+    // ------------------------------------------------------
+    // VALIDATE NAMES
+    // ------------------------------------------------------
 
-            code:
-              department.code,
-          },
+    if (
+      normalizedFirstName.length < 2 ||
+      normalizedLastName.length < 2
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "First name and last name must contain at least 2 characters.",
+      });
+    }
 
-          program: {
-            id:
-              program.id,
+    // ------------------------------------------------------
+    // VALIDATE SEMESTER
+    // ------------------------------------------------------
 
-            name:
-              program.name,
+    const normalizedSemester =
+      Number(semester);
 
-            code:
-              program.code,
-          },
+    if (
+      !Number.isInteger(
+        normalizedSemester
+      ) ||
+      normalizedSemester < 1 ||
+      normalizedSemester > 12
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Semester must be a valid number between 1 and 12.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // VALIDATE ADMISSION YEAR
+    // ------------------------------------------------------
+
+    const normalizedAdmissionYear =
+      Number(admissionYear);
+
+    if (
+      !Number.isInteger(
+        normalizedAdmissionYear
+      ) ||
+      normalizedAdmissionYear < 2000 ||
+      normalizedAdmissionYear > 2100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Admission year is invalid.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // VALIDATE DEPARTMENT ID
+    // ------------------------------------------------------
+
+    const normalizedDepartmentId =
+      Number(departmentId);
+
+    if (
+      !Number.isInteger(
+        normalizedDepartmentId
+      ) ||
+      normalizedDepartmentId <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid department ID.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // VALIDATE PROGRAM ID
+    // ------------------------------------------------------
+
+    const normalizedProgramId =
+      Number(programId);
+
+    if (
+      !Number.isInteger(
+        normalizedProgramId
+      ) ||
+      normalizedProgramId <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid program ID.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // VALIDATE BATCH
+    // ------------------------------------------------------
+
+    if (
+      normalizedBatch &&
+      !/^[A-Za-z0-9]+$/.test(
+        normalizedBatch
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Batch can contain only letters and numbers.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // VALIDATE DIVISION
+    // ------------------------------------------------------
+
+    if (
+      normalizedDivision &&
+      !/^[A-Za-z0-9]+$/.test(
+        normalizedDivision
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Division can contain only letters and numbers.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // VALIDATE PHONE
+    // ------------------------------------------------------
+
+    if (
+      normalizedPhone &&
+      !/^[0-9+\-\s()]{7,20}$/.test(
+        normalizedPhone
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid phone number.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // VALIDATE DATE OF BIRTH
+    // ------------------------------------------------------
+
+    let normalizedDateOfBirth = null;
+
+    if (
+      dateOfBirth !== undefined &&
+      dateOfBirth !== null &&
+      String(dateOfBirth).trim() !== ""
+    ) {
+      const parsedDate =
+        new Date(dateOfBirth);
+
+      if (
+        Number.isNaN(
+          parsedDate.getTime()
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid date of birth.",
+        });
+      }
+
+      normalizedDateOfBirth =
+        parsedDate;
+    }
+
+    // ------------------------------------------------------
+    // CHECK DEPARTMENT
+    // ------------------------------------------------------
+
+    const department =
+      await prisma.department.findUnique({
+        where: {
+          id: normalizedDepartmentId,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          code: true,
         },
       });
-    } catch (error) {
-      console.error(
-        "Create admin student error:",
-        error
+
+    if (!department) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Department not found.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // CHECK PROGRAM
+    // ------------------------------------------------------
+
+    const program =
+      await prisma.program.findUnique({
+        where: {
+          id: normalizedProgramId,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          departmentId: true,
+        },
+      });
+
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Program not found.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // ENSURE PROGRAM BELONGS TO DEPARTMENT
+    // ------------------------------------------------------
+
+    if (
+      program.departmentId !==
+      normalizedDepartmentId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Selected program does not belong to the selected department.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // CREATE USER + STUDENT
+    // ------------------------------------------------------
+
+    const result =
+      await prisma.$transaction(
+        async (transaction) => {
+          // ----------------------------------------------
+          // GENERATE ENROLLMENT NUMBER
+          // ----------------------------------------------
+
+          const enrollmentNumber =
+            await generateNextEnrollmentNumber(
+              transaction
+            );
+
+          // ----------------------------------------------
+          // GENERATE COLLEGE EMAIL
+          // ----------------------------------------------
+
+          const collegeEmail =
+            await generateUniqueCollegeEmail(
+              enrollmentNumber,
+              transaction
+            );
+
+          // ----------------------------------------------
+          // GENERATE TEMPORARY PASSWORD
+          // ----------------------------------------------
+
+          const temporaryPassword =
+            generateTemporaryPassword();
+
+          const passwordHash =
+            await bcrypt.hash(
+              temporaryPassword,
+              10
+            );
+
+          // ----------------------------------------------
+          // CREATE USER
+          // ----------------------------------------------
+
+          const user =
+            await transaction.user.create({
+              data: {
+                firstName:
+                  normalizedFirstName,
+
+                lastName:
+                  normalizedLastName,
+
+                email:
+                  collegeEmail,
+
+                passwordHash,
+
+                role: "STUDENT",
+
+                isActive: true,
+
+                mustChangePassword: true,
+              },
+
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                role: true,
+                isActive: true,
+                mustChangePassword: true,
+                createdAt: true,
+              },
+            });
+
+          // ----------------------------------------------
+          // CREATE STUDENT
+          // ----------------------------------------------
+
+          const student =
+            await transaction.student.create({
+              data: {
+                userId: user.id,
+
+                enrollmentNumber,
+
+                semester:
+                  normalizedSemester,
+
+                admissionYear:
+                  normalizedAdmissionYear,
+
+                phone:
+                  normalizedPhone,
+
+                dateOfBirth:
+                  normalizedDateOfBirth,
+
+                batch:
+                  normalizedBatch,
+
+                division:
+                  normalizedDivision,
+
+                departmentId:
+                  normalizedDepartmentId,
+
+                programId:
+                  normalizedProgramId,
+              },
+
+              select: {
+                id: true,
+                enrollmentNumber: true,
+                semester: true,
+                admissionYear: true,
+                phone: true,
+                dateOfBirth: true,
+                batch: true,
+                division: true,
+                departmentId: true,
+                programId: true,
+              },
+            });
+
+          return {
+            user,
+            student,
+            temporaryPassword,
+          };
+        }
       );
 
-      // ------------------------------------------------------
-      // PRISMA UNIQUE CONSTRAINT ERROR
-      // ------------------------------------------------------
+    // ------------------------------------------------------
+    // RESPONSE
+    // ------------------------------------------------------
 
-      if (
-        error?.code === "P2002"
-      ) {
-        return res.status(409).json({
-          success: false,
+    return res.status(201).json({
+      success: true,
 
-          message:
-            "A student or account with the generated information already exists. Please try again.",
+      message:
+        "Student account created successfully.",
 
-          error:
-            error?.meta?.target ||
-            undefined,
-        });
-      }
+      data: {
+        student:
+          result.student,
 
-      return res.status(500).json({
+        user:
+          result.user,
+
+        credentials: {
+          enrollmentNumber:
+            result.student
+              .enrollmentNumber,
+
+          email:
+            result.user.email,
+
+          temporaryPassword:
+            result.temporaryPassword,
+        },
+
+        department: {
+          id:
+            department.id,
+
+          name:
+            department.name,
+
+          code:
+            department.code,
+        },
+
+        program: {
+          id:
+            program.id,
+
+          name:
+            program.name,
+
+          code:
+            program.code,
+        },
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Create admin student error:",
+      error
+    );
+
+    // ------------------------------------------------------
+    // PRISMA UNIQUE CONSTRAINT ERROR
+    // ------------------------------------------------------
+
+    if (
+      error?.code === "P2002"
+    ) {
+      return res.status(409).json({
         success: false,
 
         message:
-          error?.message ||
-          "Failed to create student account.",
+          "A student or account with the generated information already exists. Please try again.",
+
+        error:
+          error?.meta?.target ||
+          undefined,
       });
     }
-  };
+
+    return res.status(500).json({
+      success: false,
+
+      message:
+        error?.message ||
+        "Failed to create student account.",
+    });
+  }
+};
 
 /* =========================================================
    GET ALL STUDENTS
@@ -1046,34 +1046,32 @@ export const getAdminStudentById =
 
       try {
         enrollments =
-          await prisma.courseEnrollment.findMany(
-            {
-              where: {
-                studentId:
-                  studentId,
-              },
+          await prisma.courseEnrollment.findMany({
+            where: {
+              studentId:
+                studentId,
+            },
 
-              orderBy: {
-                id: "asc",
-              },
+            orderBy: {
+              id: "asc",
+            },
 
-              select: {
-                id: true,
-                progressPercent: true,
+            select: {
+              id: true,
+              progressPercent: true,
 
-                course: {
-                  select: {
-                    id: true,
-                    code: true,
-                    name: true,
-                    type: true,
-                    credits: true,
-                    semester: true,
-                  },
+              course: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  type: true,
+                  credits: true,
+                  semester: true,
                 },
               },
-            }
-          );
+            },
+          });
       } catch (enrollmentError) {
         console.error(
           "Student enrollment query error:",

@@ -21,6 +21,7 @@ dotenv.config({
 // ===============================
 import authRoutes from "./routes/authRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
+import studentResultRoutes from "./routes/studentResultRoutes.js";
 import facultyRoutes from "./routes/facultyRoutes.js";
 import courseRoutes from "./routes/courseRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
@@ -77,6 +78,7 @@ app.use(
 // ===============================
 app.use("/api/auth", authRoutes);
 app.use("/api/student", studentRoutes);
+app.use("/api/student-results", studentResultRoutes);
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/attendance", attendanceRoutes);
@@ -110,7 +112,10 @@ app.use("/api/admin/reports", adminReportRoutes);
 app.use("/api/admin/results", adminResultRoutes);
 app.use("/api/admin/academic-years", adminAcademicYearRoutes);
 app.use("/api/admin/fee-structures", adminFeeStructureRoutes);
-app.use("/api/admin/payment-settings",adminPaymentSettingRoutes);
+app.use(
+  "/api/admin/payment-settings",
+  adminPaymentSettingRoutes
+);
 
 console.log("✅ Admin fee structure routes registered");
 

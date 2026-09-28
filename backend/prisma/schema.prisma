@@ -11,15 +11,16 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  firstName    String
-  lastName     String
-  email        String   @unique
-  passwordHash String
-  role         UserRole
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 Int      @id @default(autoincrement())
+  firstName          String
+  lastName           String
+  email              String   @unique
+  passwordHash       String
+  role               UserRole
+  isActive           Boolean  @default(true)
+  mustChangePassword Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   faculty Faculty?
   student Student?
@@ -69,9 +70,9 @@ model Faculty {
   assignments Assignment[]
   courses     Course[]
   exams       Exam[]
-  notices     Notice[]        @relation("FacultyCreatedNotices")
-  department  Department      @relation(fields: [departmentId], references: [id])
-  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notices     Notice[]         @relation("FacultyCreatedNotices")
+  department  Department       @relation(fields: [departmentId], references: [id])
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   timetable   TimetableEntry[]
 }
 
@@ -83,11 +84,11 @@ model Department {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  courses        Course[]
-  faculty        Faculty[]
-  programs       Program[]
-  students       Student[]       @relation("StudentDepartment")
-  feeStructures  FeeStructure[]
+  courses       Course[]
+  faculty       Faculty[]
+  programs      Program[]
+  students      Student[]      @relation("StudentDepartment")
+  feeStructures FeeStructure[]
 }
 
 model Program {
@@ -99,10 +100,10 @@ model Program {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  courses        Course[]
-  department     Department     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  students       Student[]      @relation("StudentProgram")
-  feeStructures  FeeStructure[]
+  courses       Course[]
+  department    Department     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  students      Student[]      @relation("StudentProgram")
+  feeStructures FeeStructure[]
 
   @@index([departmentId])
 }
@@ -124,22 +125,22 @@ model AcademicYear {
 }
 
 model FeeStructure {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   departmentId   Int
   programId      Int
   academicYearId Int
   semester       Int
   name           String
   description    String?
-  totalAmount    Int      @default(0)
+  totalAmount    Int       @default(0)
   dueDate        DateTime?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  department   Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  program      Program          @relation(fields: [programId], references: [id], onDelete: Cascade)
-  academicYear AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  department   Department     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  program      Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear   @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   components   FeeComponent[]
   fees         Fee[]
 
@@ -181,14 +182,14 @@ model Course {
 
   assignments   Assignment[]
   attendance    AttendanceRecord[]
-  department    Department          @relation(fields: [departmentId], references: [id])
-  faculty       Faculty?            @relation(fields: [facultyId], references: [id])
-  program       Program             @relation(fields: [programId], references: [id])
+  department    Department         @relation(fields: [departmentId], references: [id])
+  faculty       Faculty?           @relation(fields: [facultyId], references: [id])
+  program       Program            @relation(fields: [programId], references: [id])
   enrollments   CourseEnrollment[]
   exams         Exam[]
   results       ExamResult[]
   timetable     TimetableEntry[]
-  noticeTargets Notice[]            @relation("NoticeTargetCourse")
+  noticeTargets Notice[]           @relation("NoticeTargetCourse")
 }
 
 model CourseEnrollment {
@@ -270,13 +271,13 @@ model AssignmentSubmission {
   marksObtained Int?
   remarks       String?
 
-  fileName      String?
-  fileUrl       String?
-  fileSize      Int?
-  fileType      String?
+  fileName String?
+  fileUrl  String?
+  fileSize Int?
+  fileType String?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -364,16 +365,16 @@ model FeePayment {
 }
 
 model Notice {
-  id                 Int       @id @default(autoincrement())
-  title              String
-  message            String
-  category           String    @default("GENERAL")
-  priority           String    @default("NORMAL")
-  isPublished        Boolean   @default(true)
-  publishedAt        DateTime  @default(now())
-  expiresAt          DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id          Int       @id @default(autoincrement())
+  title       String
+  message     String
+  category    String    @default("GENERAL")
+  priority    String    @default("NORMAL")
+  isPublished Boolean   @default(true)
+  publishedAt DateTime  @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   targetSemester     Int?
   targetCourseId     Int?
@@ -400,8 +401,8 @@ enum UserRole {
   STUDENT
   FACULTY
   ADMIN
-  PARENT
 }
+
 model PaymentSetting {
   id            Int      @id @default(autoincrement())
   onlinePayment Boolean  @default(true)

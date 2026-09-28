@@ -2,42 +2,41 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  CalendarDays,
-  Clock3,
-  BookOpen,
-  UserRound,
   Award,
-  Search,
-  RefreshCw,
-  X,
+  BookOpen,
+  CalendarDays,
   CheckCircle2,
   CircleAlert,
-  GraduationCap,
   FileText,
+  RefreshCw,
+  Search,
   TrendingUp,
+  X,
 } from "lucide-react";
 
 import { apiGet, logoutUser } from "../api";
 
-const Examinations = () => {
+const Results = () => {
   const navigate = useNavigate();
 
-  const [exams, setExams] = useState([]);
+  const [results, setResults] = useState([]);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-
-  const [selectedExam, setSelectedExam] = useState(null);
+  const [gradeFilter, setGradeFilter] = useState("ALL");
+  const [selectedResult, setSelectedResult] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
   const getErrorMessage = (err) => {
     return (
       err?.response?.data?.message ||
       err?.message ||
-      "Failed to load examinations"
+      "Failed to load results"
     );
   };
 
@@ -54,7 +53,151 @@ const Examinations = () => {
     );
   };
 
-  const loadExams = useCallback(
+  const getMarks = (result) => {
+    const value = Number(result?.marksObtained);
+
+    return Number.isNaN(value) ? null : value;
+  };
+
+  const getMaxMarks = (result) => {
+    const value =
+      Number(result?.exam?.maxMarks) ||
+      Number(result?.maxMarks);
+
+    return Number.isNaN(value) || value <= 0 ? null : value;
+  };
+
+  const getPercentage = (result) => {
+    const marks = getMarks(result);
+    const maxMarks = getMaxMarks(result);
+
+    if (
+      marks === null ||
+      maxMarks === null ||
+      maxMarks <= 0
+    ) {
+      return null;
+    }
+
+    return Math.min(
+      Math.max((marks / maxMarks) * 100, 0),
+      100
+    );
+  };
+
+  const getPerformanceClass = (percentage) => {
+    if (percentage === null) {
+      return "";
+    }
+
+    if (percentage >= 75) {
+      return "performance-good";
+    }
+
+    if (percentage >= 50) {
+      return "performance-average";
+    }
+
+    return "performance-low";
+  };
+
+  const getResultGrade = (result) => {
+    return String(result?.grade || "N/A").trim().toUpperCase();
+  };
+
+  const getExamType = (result) => {
+    return String(
+      result?.exam?.examType ||
+        result?.examType ||
+        "EXAM"
+    )
+      .trim()
+      .toUpperCase();
+  };
+
+  const getExamTitle = (result) => {
+    return (
+      result?.exam?.title ||
+      result?.title ||
+      "Examination"
+    );
+  };
+
+  const getCourseCode = (result) => {
+    return (
+      result?.course?.code ||
+      result?.courseCode ||
+      "N/A"
+    );
+  };
+
+  const getCourseName = (result) => {
+    return (
+      result?.course?.name ||
+      result?.courseName ||
+      "Course"
+    );
+  };
+
+  const getExamDate = (result) => {
+    const value =
+      result?.exam?.examDate ||
+      result?.examDate;
+
+    if (!value) {
+      return null;
+    }
+
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime())
+      ? null
+      : date;
+  };
+
+  const formatDate = (result) => {
+    const date = getExamDate(result);
+
+    if (!date) {
+      return "Date not available";
+    }
+
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatMonth = (result) => {
+    const date = getExamDate(result);
+
+    if (!date) {
+      return "---";
+    }
+
+    return date.toLocaleDateString("en-IN", {
+      month: "short",
+    });
+  };
+
+  const formatDay = (result) => {
+    const date = getExamDate(result);
+
+    if (!date) {
+      return "--";
+    }
+
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+    });
+  };
+
+  // ============================================================
+  // LOAD RESULTS
+  // ============================================================
+
+  const loadResults = useCallback(
     async (isRefresh = false) => {
       try {
         if (isRefresh) {
@@ -65,15 +208,19 @@ const Examinations = () => {
 
         setError("");
 
-        const response = await apiGet("/exams/my-exams");
+        const response = await apiGet("/student/results");
 
-        const examData =
-          response?.exams ||
-          response?.data?.exams ||
-          response?.data?.data?.exams ||
+        const resultData =
+          response?.results ||
+          response?.data?.results ||
+          response?.data?.data?.results ||
           [];
 
-        setExams(Array.isArray(examData) ? examData : []);
+        setResults(
+          Array.isArray(resultData)
+            ? resultData
+            : []
+        );
       } catch (err) {
         const message = getErrorMessage(err);
 
@@ -93,309 +240,172 @@ const Examinations = () => {
   );
 
   useEffect(() => {
-    loadExams();
-  }, [loadExams]);
+    loadResults();
+  }, [loadResults]);
 
-  const normalizeExamType = (value) => {
-    return String(value || "EXAM")
-      .trim()
-      .toUpperCase();
-  };
+  // ============================================================
+  // GRADE OPTIONS
+  // ============================================================
 
-  const getExamDate = (exam) => {
-    const date = new Date(exam?.examDate);
+  const gradeOptions = useMemo(() => {
+    const grades = results
+      .map((result) => getResultGrade(result))
+      .filter((grade) => grade !== "N/A");
 
-    return Number.isNaN(date.getTime()) ? null : date;
-  };
+    return [
+      "ALL",
+      ...Array.from(new Set(grades)),
+    ];
+  }, [results]);
 
-  const isUpcoming = (exam) => {
-    const date = getExamDate(exam);
+  // ============================================================
+  // FILTERED RESULTS
+  // ============================================================
 
-    if (!date) return false;
-
-    return date.getTime() >= Date.now();
-  };
-
-  const isCompleted = (exam) => {
-    const date = getExamDate(exam);
-
-    if (!date) return false;
-
-    return date.getTime() < Date.now();
-  };
-
-  const formatDate = (dateValue) => {
-    const date = getExamDate({ examDate: dateValue });
-
-    if (!date) return "Date not available";
-
-    return date.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const formatDay = (dateValue) => {
-    const date = getExamDate({ examDate: dateValue });
-
-    if (!date) return "--";
-
-    return date.toLocaleDateString("en-IN", {
-      day: "2-digit",
-    });
-  };
-
-  const formatMonth = (dateValue) => {
-    const date = getExamDate({ examDate: dateValue });
-
-    if (!date) return "---";
-
-    return date.toLocaleDateString("en-IN", {
-      month: "short",
-    });
-  };
-
-  const formatTime = (dateValue) => {
-    const date = getExamDate({ examDate: dateValue });
-
-    if (!date) return "Time not available";
-
-    return date.toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const getFacultyName = (exam) => {
-    const user = exam?.faculty?.user;
-
-    if (!user) return "Faculty not assigned";
-
-    const name = `${user.firstName || ""} ${
-      user.lastName || ""
-    }`.trim();
-
-    return name || "Faculty not assigned";
-  };
-
-  const getExamStatus = (exam) => {
-    if (isUpcoming(exam)) {
-      return {
-        label: "Upcoming",
-        className: "status-upcoming",
-        icon: CalendarDays,
-      };
-    }
-
-    if (exam?.result) {
-      return {
-        label: "Result Available",
-        className: "status-result",
-        icon: CheckCircle2,
-      };
-    }
-
-    return {
-      label: "Completed",
-      className: "status-completed",
-      icon: CheckCircle2,
-    };
-  };
-
-  const examTypes = useMemo(() => {
-    const types = exams
-      .map((exam) => normalizeExamType(exam.examType))
-      .filter(Boolean);
-
-    return ["ALL", ...Array.from(new Set(types))];
-  }, [exams]);
-
-  const stats = useMemo(() => {
-    const upcoming = exams.filter(isUpcoming).length;
-    const completed = exams.filter(isCompleted).length;
-    const results = exams.filter((exam) => exam?.result).length;
-
-    return {
-      total: exams.length,
-      upcoming,
-      completed,
-      results,
-    };
-  }, [exams]);
-
-  const filteredExams = useMemo(() => {
+  const filteredResults = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return [...exams]
-      .filter((exam) => {
-        if (!query) return true;
-
-        const course = exam?.course || {};
-        const facultyName = getFacultyName(exam);
+    return [...results]
+      .filter((result) => {
+        if (!query) {
+          return true;
+        }
 
         return (
-          String(exam?.title || "")
+          getCourseCode(result)
             .toLowerCase()
             .includes(query) ||
-          String(exam?.examType || "")
+          getCourseName(result)
             .toLowerCase()
             .includes(query) ||
-          String(course?.code || "")
+          getExamTitle(result)
             .toLowerCase()
             .includes(query) ||
-          String(course?.name || "")
+          getExamType(result)
             .toLowerCase()
             .includes(query) ||
-          facultyName.toLowerCase().includes(query)
+          getResultGrade(result)
+            .toLowerCase()
+            .includes(query)
         );
       })
-      .filter((exam) => {
-        if (typeFilter === "ALL") return true;
+      .filter((result) => {
+        if (gradeFilter === "ALL") {
+          return true;
+        }
 
         return (
-          normalizeExamType(exam.examType) === typeFilter
+          getResultGrade(result) ===
+          gradeFilter
         );
-      })
-      .filter((exam) => {
-        if (statusFilter === "ALL") return true;
-
-        if (statusFilter === "UPCOMING") {
-          return isUpcoming(exam);
-        }
-
-        if (statusFilter === "COMPLETED") {
-          return isCompleted(exam);
-        }
-
-        if (statusFilter === "RESULT") {
-          return Boolean(exam?.result);
-        }
-
-        return true;
       })
       .sort((a, b) => {
         const first =
           getExamDate(a)?.getTime() || 0;
+
         const second =
           getExamDate(b)?.getTime() || 0;
 
-        return first - second;
+        return second - first;
       });
-  }, [exams, search, typeFilter, statusFilter]);
+  }, [results, search, gradeFilter]);
 
-  const getMarksPercentage = (exam) => {
-    if (!exam?.result) return null;
+  // ============================================================
+  // STATISTICS
+  // ============================================================
 
-    const marks = Number(exam.result.marksObtained);
-    const maxMarks = Number(exam.maxMarks);
+  const stats = useMemo(() => {
+    const total = results.length;
 
-    if (
-      Number.isNaN(marks) ||
-      Number.isNaN(maxMarks) ||
-      maxMarks <= 0
-    ) {
-      return null;
-    }
-
-    return Math.min(
-      Math.max((marks / maxMarks) * 100, 0),
-      100
-    );
-  };
-
-  const getPerformanceClass = (percentage) => {
-    if (percentage === null) return "";
-
-    if (percentage >= 75) {
-      return "performance-good";
-    }
-
-    if (percentage >= 50) {
-      return "performance-average";
-    }
-
-    return "performance-low";
-  };
-
-  const getDaysRemaining = (exam) => {
-    const date = getExamDate(exam);
-
-    if (!date || !isUpcoming(exam)) {
-      return null;
-    }
-
-    const now = new Date();
-
-    const today = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    );
-
-    const examDay = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate()
-    );
-
-    const difference =
-      examDay.getTime() - today.getTime();
-
-    return Math.ceil(
-      difference / (1000 * 60 * 60 * 24)
-    );
-  };
-
-  const renderDaysRemaining = (exam) => {
-    const days = getDaysRemaining(exam);
-
-    if (days === null) {
-      return null;
-    }
-
-    if (days === 0) {
-      return (
-        <span className="exam-countdown countdown-today">
-          Today
-        </span>
+    const percentages = results
+      .map(getPercentage)
+      .filter(
+        (percentage) =>
+          percentage !== null
       );
-    }
 
-    if (days === 1) {
-      return (
-        <span className="exam-countdown countdown-soon">
-          Tomorrow
-        </span>
+    const average =
+      percentages.length > 0
+        ? percentages.reduce(
+            (sum, value) => sum + value,
+            0
+          ) / percentages.length
+        : null;
+
+    const passed = results.filter(
+      (result) => {
+        const percentage =
+          getPercentage(result);
+
+        const grade =
+          getResultGrade(result);
+
+        if (
+          ["F", "FAIL", "FAILED"].includes(
+            grade
+          )
+        ) {
+          return false;
+        }
+
+        return (
+          percentage === null ||
+          percentage >= 40
+        );
+      }
+    ).length;
+
+    const gradePoints = results
+      .map((result) => {
+        const value = Number(
+          result?.gradePoint
+        );
+
+        return Number.isNaN(value)
+          ? null
+          : value;
+      })
+      .filter(
+        (value) => value !== null
       );
-    }
 
-    if (days <= 7) {
-      return (
-        <span className="exam-countdown countdown-soon">
-          {days} days left
-        </span>
-      );
-    }
+    const averageGradePoint =
+      gradePoints.length > 0
+        ? gradePoints.reduce(
+            (sum, value) => sum + value,
+            0
+          ) / gradePoints.length
+        : null;
 
-    return (
-      <span className="exam-countdown">
-        {days} days left
-      </span>
-    );
-  };
+    return {
+      total,
+      passed,
+      failed: Math.max(total - passed, 0),
+      average,
+      averageGradePoint,
+    };
+  }, [results]);
+
+  // ============================================================
+  // LOADING
+  // ============================================================
 
   if (loading) {
     return (
       <>
-        <style>{examinationStyles}</style>
+        <style>{resultStyles}</style>
 
-        <div className="examination-page">
-          <div className="examination-loading">
+        <div className="result-page">
+          <div className="result-loading">
             <div className="loading-spinner" />
-            <h3>Loading examinations...</h3>
+
+            <h3>
+              Loading results...
+            </h3>
+
             <p>
-              Please wait while we fetch your exam schedule.
+              Please wait while we fetch
+              your examination results.
             </p>
           </div>
         </div>
@@ -403,32 +413,44 @@ const Examinations = () => {
     );
   }
 
+  // ============================================================
+  // MAIN PAGE
+  // ============================================================
+
   return (
     <>
-      <style>{examinationStyles}</style>
+      <style>{resultStyles}</style>
 
-      <div className="examination-page">
-        <div className="examination-container">
+      <div className="result-page">
+        <div className="result-container">
           {/* HEADER */}
           <div className="page-header">
             <div className="page-header-left">
               <button
                 className="back-button"
-                onClick={() => navigate("/dashboard")}
+                onClick={() =>
+                  navigate("/dashboard")
+                }
               >
                 <ArrowLeft size={18} />
-                <span>Back to Dashboard</span>
+
+                <span>
+                  Back to Dashboard
+                </span>
               </button>
 
               <div className="page-title">
                 <div className="page-title-icon">
-                  <GraduationCap size={27} />
+                  <TrendingUp size={27} />
                 </div>
 
                 <div>
-                  <h1>Examinations</h1>
+                  <h1>Results</h1>
+
                   <p>
-                    View your upcoming and completed examinations
+                    View your examination
+                    results and academic
+                    performance
                   </p>
                 </div>
               </div>
@@ -436,18 +458,25 @@ const Examinations = () => {
 
             <button
               className="refresh-button"
-              onClick={() => loadExams(true)}
+              onClick={() =>
+                loadResults(true)
+              }
               disabled={refreshing}
-              title="Refresh examinations"
+              title="Refresh results"
             >
               <RefreshCw
                 size={18}
                 className={
-                  refreshing ? "spin-animation" : ""
+                  refreshing
+                    ? "spin-animation"
+                    : ""
                 }
               />
+
               <span>
-                {refreshing ? "Refreshing..." : "Refresh"}
+                {refreshing
+                  ? "Refreshing..."
+                  : "Refresh"}
               </span>
             </button>
           </div>
@@ -458,11 +487,18 @@ const Examinations = () => {
               <CircleAlert size={20} />
 
               <div>
-                <strong>Unable to load examinations</strong>
+                <strong>
+                  Unable to load results
+                </strong>
+
                 <p>{error}</p>
               </div>
 
-              <button onClick={() => loadExams()}>
+              <button
+                onClick={() =>
+                  loadResults()
+                }
+              >
                 Try Again
               </button>
             </div>
@@ -477,51 +513,105 @@ const Examinations = () => {
 
               <div>
                 <span className="summary-label">
-                  Total Exams
+                  Total Results
                 </span>
-                <strong>{stats.total}</strong>
+
+                <strong>
+                  {stats.total}
+                </strong>
               </div>
             </div>
 
             <div className="summary-card">
-              <div className="summary-icon upcoming-icon">
-                <CalendarDays size={21} />
-              </div>
-
-              <div>
-                <span className="summary-label">
-                  Upcoming
-                </span>
-                <strong>{stats.upcoming}</strong>
-              </div>
-            </div>
-
-            <div className="summary-card">
-              <div className="summary-icon completed-icon">
+              <div className="summary-icon passed-icon">
                 <CheckCircle2 size={21} />
               </div>
 
               <div>
                 <span className="summary-label">
-                  Completed
+                  Passed
                 </span>
-                <strong>{stats.completed}</strong>
+
+                <strong>
+                  {stats.passed}
+                </strong>
               </div>
             </div>
 
             <div className="summary-card">
-              <div className="summary-icon result-icon">
+              <div className="summary-icon failed-icon">
+                <CircleAlert size={21} />
+              </div>
+
+              <div>
+                <span className="summary-label">
+                  Failed
+                </span>
+
+                <strong>
+                  {stats.failed}
+                </strong>
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-icon average-icon">
                 <Award size={21} />
               </div>
 
               <div>
                 <span className="summary-label">
-                  Results Available
+                  Average %
                 </span>
-                <strong>{stats.results}</strong>
+
+                <strong>
+                  {stats.average === null
+                    ? "--"
+                    : `${stats.average.toFixed(
+                        1
+                      )}%`}
+                </strong>
               </div>
             </div>
           </div>
+
+          {/* ACADEMIC PERFORMANCE */}
+          {results.length > 0 && (
+            <div className="performance-banner">
+              <div className="performance-banner-icon">
+                <TrendingUp size={22} />
+              </div>
+
+              <div className="performance-banner-content">
+                <span>
+                  Academic Performance
+                </span>
+
+                <strong>
+                  {stats.average === null
+                    ? "Marks not available"
+                    : `${stats.average.toFixed(
+                        1
+                      )}% average performance`}
+                </strong>
+              </div>
+
+              {stats.averageGradePoint !==
+                null && (
+                <div className="cgpa-box">
+                  <span>
+                    Avg. Grade Point
+                  </span>
+
+                  <strong>
+                    {stats.averageGradePoint.toFixed(
+                      2
+                    )}
+                  </strong>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* FILTERS */}
           <div className="filter-card">
@@ -532,15 +622,19 @@ const Examinations = () => {
                 type="text"
                 value={search}
                 onChange={(event) =>
-                  setSearch(event.target.value)
+                  setSearch(
+                    event.target.value
+                  )
                 }
-                placeholder="Search exam, course or faculty..."
+                placeholder="Search course, exam or grade..."
               />
 
               {search && (
                 <button
                   className="clear-search"
-                  onClick={() => setSearch("")}
+                  onClick={() =>
+                    setSearch("")
+                  }
                   title="Clear search"
                 >
                   <X size={16} />
@@ -549,41 +643,30 @@ const Examinations = () => {
             </div>
 
             <div className="filter-group">
-              <label>Exam Type</label>
+              <label>
+                Grade
+              </label>
 
               <select
-                value={typeFilter}
+                value={gradeFilter}
                 onChange={(event) =>
-                  setTypeFilter(event.target.value)
+                  setGradeFilter(
+                    event.target.value
+                  )
                 }
               >
-                {examTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type === "ALL"
-                      ? "All Types"
-                      : type}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="filter-group">
-              <label>Status</label>
-
-              <select
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value)
-                }
-              >
-                <option value="ALL">All Status</option>
-                <option value="UPCOMING">Upcoming</option>
-                <option value="COMPLETED">
-                  Completed
-                </option>
-                <option value="RESULT">
-                  Result Available
-                </option>
+                {gradeOptions.map(
+                  (grade) => (
+                    <option
+                      key={grade}
+                      value={grade}
+                    >
+                      {grade === "ALL"
+                        ? "All Grades"
+                        : grade}
+                    </option>
+                  )
+                )}
               </select>
             </div>
           </div>
@@ -591,41 +674,50 @@ const Examinations = () => {
           {/* RESULT COUNT */}
           <div className="results-heading">
             <div>
-              <h2>Your Examinations</h2>
+              <h2>
+                Your Results
+              </h2>
+
               <span>
-                {filteredExams.length}{" "}
-                {filteredExams.length === 1
-                  ? "examination"
-                  : "examinations"}{" "}
+                {filteredResults.length}{" "}
+                {filteredResults.length ===
+                1
+                  ? "result"
+                  : "results"}{" "}
                 found
               </span>
             </div>
           </div>
 
           {/* EMPTY */}
-          {filteredExams.length === 0 ? (
+          {filteredResults.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">
-                <CalendarDays size={34} />
+                <Award size={34} />
               </div>
 
-              <h3>No examinations found</h3>
+              <h3>
+                {results.length === 0
+                  ? "No results available"
+                  : "No matching results"}
+              </h3>
 
               <p>
-                {exams.length === 0
-                  ? "No examinations have been scheduled for your enrolled courses yet."
-                  : "Try changing your search or filters."}
+                {results.length === 0
+                  ? "Your examination results will appear here once they are published."
+                  : "Try changing your search or grade filter."}
               </p>
 
               {(search ||
-                typeFilter !== "ALL" ||
-                statusFilter !== "ALL") && (
+                gradeFilter !==
+                  "ALL") && (
                 <button
                   className="reset-button"
                   onClick={() => {
                     setSearch("");
-                    setTypeFilter("ALL");
-                    setStatusFilter("ALL");
+                    setGradeFilter(
+                      "ALL"
+                    );
                   }}
                 >
                   Clear Filters
@@ -633,179 +725,232 @@ const Examinations = () => {
               )}
             </div>
           ) : (
-            <div className="exam-list">
-              {filteredExams.map((exam) => {
-                const status = getExamStatus(exam);
-                const StatusIcon = status.icon;
-                const percentage =
-                  getMarksPercentage(exam);
+            <div className="result-list">
+              {filteredResults.map(
+                (result) => {
+                  const percentage =
+                    getPercentage(
+                      result
+                    );
 
-                return (
-                  <div
-                    className="exam-card"
-                    key={exam.id}
-                    onClick={() =>
-                      setSelectedExam(exam)
-                    }
-                  >
-                    <div className="exam-date-box">
-                      <span>
-                        {formatMonth(exam.examDate)}
-                      </span>
-                      <strong>
-                        {formatDay(exam.examDate)}
-                      </strong>
-                    </div>
+                  const performanceClass =
+                    getPerformanceClass(
+                      percentage
+                    );
 
-                    <div className="exam-main">
-                      <div className="exam-top-row">
-                        <div>
-                          <div className="exam-title-row">
-                            <h3>
-                              {exam.title ||
-                                "Untitled Examination"}
-                            </h3>
+                  const grade =
+                    getResultGrade(
+                      result
+                    );
 
-                            <span className="exam-type">
-                              {exam.examType ||
-                                "EXAM"}
-                            </span>
-                          </div>
+                  return (
+                    <div
+                      className="result-card"
+                      key={
+                        result.id
+                      }
+                      onClick={() =>
+                        setSelectedResult(
+                          result
+                        )
+                      }
+                    >
+                      {/* DATE */}
+                      <div className="result-date-box">
+                        <span>
+                          {formatMonth(
+                            result
+                          )}
+                        </span>
 
-                          <div className="course-info">
-                            <BookOpen size={16} />
-
-                            <strong>
-                              {exam.course?.code ||
-                                "N/A"}
-                            </strong>
-
-                            <span>
-                              {exam.course?.name ||
-                                "Course"}
-                            </span>
-
-                            {exam.course?.credits !==
-                              undefined &&
-                              exam.course?.credits !==
-                                null && (
-                                <span className="credits">
-                                  {exam.course.credits}{" "}
-                                  credits
-                                </span>
-                              )}
-                          </div>
-                        </div>
-
-                        <div
-                          className={`exam-status ${status.className}`}
-                        >
-                          <StatusIcon size={15} />
-                          {status.label}
-                        </div>
+                        <strong>
+                          {formatDay(
+                            result
+                          )}
+                        </strong>
                       </div>
 
-                      <div className="exam-details-row">
-                        <div className="detail-item">
-                          <CalendarDays size={16} />
-                          <span>
-                            {formatDate(
-                              exam.examDate
-                            )}
-                          </span>
-                        </div>
+                      {/* MAIN */}
+                      <div className="result-main">
+                        <div className="result-top-row">
+                          <div>
+                            <div className="result-title-row">
+                              <h3>
+                                {getCourseName(
+                                  result
+                                )}
+                              </h3>
 
-                        <div className="detail-item">
-                          <Clock3 size={16} />
-                          <span>
-                            {formatTime(
-                              exam.examDate
-                            )}
-                          </span>
-                        </div>
+                              <span className="exam-type">
+                                {getExamType(
+                                  result
+                                )}
+                              </span>
+                            </div>
 
-                        <div className="detail-item">
-                          <UserRound size={16} />
-                          <span>
-                            {getFacultyName(exam)}
-                          </span>
-                        </div>
+                            <div className="course-info">
+                              <BookOpen
+                                size={16}
+                              />
 
-                        <div className="detail-item">
-                          <Award size={16} />
-                          <span>
-                            Max Marks:{" "}
-                            {exam.maxMarks ?? "N/A"}
-                          </span>
-                        </div>
-                      </div>
+                              <strong>
+                                {getCourseCode(
+                                  result
+                                )}
+                              </strong>
 
-                      <div className="exam-bottom-row">
-                        <div>
-                          {renderDaysRemaining(exam)}
-                        </div>
+                              {result
+                                ?.course
+                                ?.credits !==
+                                undefined &&
+                                result
+                                  ?.course
+                                  ?.credits !==
+                                  null && (
+                                  <span className="credits">
+                                    {
+                                      result
+                                        .course
+                                        .credits
+                                    }{" "}
+                                    credits
+                                  </span>
+                                )}
+                            </div>
+                          </div>
 
-                        {exam.result ? (
                           <div
-                            className={`result-preview ${getPerformanceClass(
-                              percentage
-                            )}`}
+                            className={`grade-badge ${performanceClass}`}
                           >
-                            <span className="result-grade">
-                              {exam.result.grade ||
-                                "Result"}
-                            </span>
+                            <Award
+                              size={15}
+                            />
+
+                            {grade}
+                          </div>
+                        </div>
+
+                        <div className="result-details-row">
+                          <div className="detail-item">
+                            <FileText
+                              size={16}
+                            />
 
                             <span>
-                              {exam.result.marksObtained ??
-                                "--"}{" "}
-                              /{" "}
-                              {exam.maxMarks ??
-                                "--"}{" "}
-                              marks
+                              {
+                                getExamTitle(
+                                  result
+                                )
+                              }
                             </span>
+                          </div>
 
-                            {exam.result.gradePoint !==
-                              null &&
-                              exam.result.gradePoint !==
-                                undefined && (
+                          <div className="detail-item">
+                            <CalendarDays
+                              size={16}
+                            />
+
+                            <span>
+                              {formatDate(
+                                result
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="detail-item">
+                            <Award
+                              size={16}
+                            />
+
+                            <span>
+                              Marks:{" "}
+                              {getMarks(
+                                result
+                              ) ?? "--"}{" "}
+                              /{" "}
+                              {getMaxMarks(
+                                result
+                              ) ?? "--"}
+                            </span>
+                          </div>
+
+                          {result
+                            ?.gradePoint !==
+                            undefined &&
+                            result
+                              ?.gradePoint !==
+                              null && (
+                              <div className="detail-item">
+                                <TrendingUp
+                                  size={16}
+                                />
+
                                 <span>
                                   GP:{" "}
                                   {
-                                    exam.result
-                                      .gradePoint
+                                    result.gradePoint
                                   }
                                 </span>
-                              )}
-                          </div>
-                        ) : isCompleted(exam) ? (
-                          <span className="result-pending">
-                            Result not available
+                              </div>
+                            )}
+                        </div>
+
+                        <div className="result-bottom-row">
+                          {percentage !==
+                            null ? (
+                            <div className="percentage-section">
+                              <div className="percentage-label">
+                                <span>
+                                  Percentage
+                                </span>
+
+                                <strong>
+                                  {percentage.toFixed(
+                                    1
+                                  )}
+                                  %
+                                </strong>
+                              </div>
+
+                              <div className="progress-track">
+                                <div
+                                  className={`progress-fill ${performanceClass}`}
+                                  style={{
+                                    width: `${percentage}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="percentage-unavailable">
+                              Marks percentage not
+                              available
+                            </span>
+                          )}
+
+                          <span className="view-result">
+                            View Details →
                           </span>
-                        ) : (
-                          <span className="exam-view">
-                            View details →
-                          </span>
-                        )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                }
+              )}
             </div>
           )}
         </div>
 
         {/* DETAILS MODAL */}
-        {selectedExam && (
+        {selectedResult && (
           <div
             className="modal-overlay"
             onClick={() =>
-              setSelectedExam(null)
+              setSelectedResult(null)
             }
           >
             <div
-              className="exam-modal"
+              className="result-modal"
               onClick={(event) =>
                 event.stopPropagation()
               }
@@ -813,20 +958,24 @@ const Examinations = () => {
               <div className="modal-header">
                 <div>
                   <span className="modal-eyebrow">
-                    {selectedExam.examType ||
-                      "EXAMINATION"}
+                    {getExamType(
+                      selectedResult
+                    )}
                   </span>
 
                   <h2>
-                    {selectedExam.title ||
-                      "Examination"}
+                    {getCourseName(
+                      selectedResult
+                    )}
                   </h2>
                 </div>
 
                 <button
                   className="modal-close"
                   onClick={() =>
-                    setSelectedExam(null)
+                    setSelectedResult(
+                      null
+                    )
                   }
                   aria-label="Close"
                 >
@@ -835,6 +984,7 @@ const Examinations = () => {
               </div>
 
               <div className="modal-body">
+                {/* COURSE */}
                 <div className="modal-course-card">
                   <div className="modal-course-icon">
                     <BookOpen size={22} />
@@ -842,226 +992,228 @@ const Examinations = () => {
 
                   <div>
                     <span>
-                      {selectedExam.course
-                        ?.code || "N/A"}
+                      {getCourseCode(
+                        selectedResult
+                      )}
                     </span>
 
                     <strong>
-                      {selectedExam.course
-                        ?.name || "Course"}
+                      {getCourseName(
+                        selectedResult
+                      )}
                     </strong>
                   </div>
                 </div>
 
+                {/* INFORMATION */}
                 <div className="modal-info-grid">
                   <div className="modal-info-item">
-                    <CalendarDays size={19} />
+                    <FileText
+                      size={19}
+                    />
+
                     <div>
-                      <span>Date</span>
+                      <span>
+                        Examination
+                      </span>
+
+                      <strong>
+                        {getExamTitle(
+                          selectedResult
+                        )}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="modal-info-item">
+                    <CalendarDays
+                      size={19}
+                    />
+
+                    <div>
+                      <span>
+                        Exam Date
+                      </span>
+
                       <strong>
                         {formatDate(
-                          selectedExam.examDate
+                          selectedResult
                         )}
                       </strong>
                     </div>
                   </div>
 
                   <div className="modal-info-item">
-                    <Clock3 size={19} />
+                    <Award size={19} />
+
                     <div>
-                      <span>Time</span>
+                      <span>
+                        Maximum Marks
+                      </span>
+
                       <strong>
-                        {formatTime(
-                          selectedExam.examDate
-                        )}
+                        {getMaxMarks(
+                          selectedResult
+                        ) ?? "N/A"}
                       </strong>
                     </div>
                   </div>
 
                   <div className="modal-info-item">
-                    <UserRound size={19} />
-                    <div>
-                      <span>Faculty</span>
-                      <strong>
-                        {getFacultyName(
-                          selectedExam
-                        )}
-                      </strong>
-                    </div>
-                  </div>
+                    <BookOpen
+                      size={19}
+                    />
 
-                  <div className="modal-info-item">
-                    <FileText size={19} />
                     <div>
-                      <span>Maximum Marks</span>
+                      <span>
+                        Credits
+                      </span>
+
                       <strong>
-                        {selectedExam.maxMarks ??
+                        {selectedResult
+                          ?.course
+                          ?.credits ??
                           "N/A"}
                       </strong>
                     </div>
                   </div>
                 </div>
 
-                <div className="modal-status-section">
-                  <span className="section-label">
-                    Examination Status
-                  </span>
+                {/* RESULT */}
+                <div className="result-detail-card">
+                  <div className="result-detail-header">
+                    <div>
+                      <span className="section-label">
+                        Examination Result
+                      </span>
+
+                      <h3>
+                        Your Performance
+                      </h3>
+                    </div>
+
+                    <div className="result-icon-large">
+                      <Award size={23} />
+                    </div>
+                  </div>
+
+                  <div className="result-detail-grid">
+                    <div>
+                      <span>
+                        Marks Obtained
+                      </span>
+
+                      <strong>
+                        {getMarks(
+                          selectedResult
+                        ) ?? "--"}{" "}
+                        /{" "}
+                        {getMaxMarks(
+                          selectedResult
+                        ) ?? "--"}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Grade
+                      </span>
+
+                      <strong>
+                        {getResultGrade(
+                          selectedResult
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Grade Point
+                      </span>
+
+                      <strong>
+                        {selectedResult
+                          ?.gradePoint ??
+                          "--"}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Percentage
+                      </span>
+
+                      <strong>
+                        {(() => {
+                          const percentage =
+                            getPercentage(
+                              selectedResult
+                            );
+
+                          return percentage ===
+                            null
+                            ? "--"
+                            : `${percentage.toFixed(
+                                1
+                              )}%`;
+                        })()}
+                      </strong>
+                    </div>
+                  </div>
 
                   {(() => {
-                    const status =
-                      getExamStatus(
-                        selectedExam
+                    const percentage =
+                      getPercentage(
+                        selectedResult
                       );
 
-                    const StatusIcon =
-                      status.icon;
+                    if (
+                      percentage === null
+                    ) {
+                      return null;
+                    }
+
+                    const performanceClass =
+                      getPerformanceClass(
+                        percentage
+                      );
 
                     return (
-                      <div
-                        className={`large-status ${status.className}`}
-                      >
-                        <StatusIcon size={19} />
-                        {status.label}
+                      <div className="progress-container">
+                        <div className="progress-label">
+                          <span>
+                            Performance
+                          </span>
+
+                          <strong>
+                            {percentage.toFixed(
+                              1
+                            )}
+                            %
+                          </strong>
+                        </div>
+
+                        <div className="progress-track">
+                          <div
+                            className={`progress-fill ${performanceClass}`}
+                            style={{
+                              width: `${percentage}%`,
+                            }}
+                          />
+                        </div>
                       </div>
                     );
                   })()}
                 </div>
-
-                {selectedExam.result ? (
-                  <div className="result-card">
-                    <div className="result-card-header">
-                      <div>
-                        <span className="section-label">
-                          Your Result
-                        </span>
-                        <h3>
-                          Examination Result
-                        </h3>
-                      </div>
-
-                      <div className="result-icon-large">
-                        <Award size={23} />
-                      </div>
-                    </div>
-
-                    <div className="result-grid">
-                      <div>
-                        <span>Marks Obtained</span>
-                        <strong>
-                          {
-                            selectedExam
-                              .result
-                              .marksObtained
-                          }{" "}
-                          /{" "}
-                          {
-                            selectedExam
-                              .maxMarks
-                          }
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>Grade</span>
-                        <strong>
-                          {selectedExam.result
-                            .grade || "--"}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>Grade Point</span>
-                        <strong>
-                          {selectedExam.result
-                            .gradePoint ??
-                            "--"}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>Percentage</span>
-                        <strong>
-                          {(() => {
-                            const percentage =
-                              getMarksPercentage(
-                                selectedExam
-                              );
-
-                            return percentage ===
-                              null
-                              ? "--"
-                              : `${percentage.toFixed(
-                                  1
-                                )}%`;
-                          })()}
-                        </strong>
-                      </div>
-                    </div>
-
-                    {(() => {
-                      const percentage =
-                        getMarksPercentage(
-                          selectedExam
-                        );
-
-                      if (
-                        percentage === null
-                      ) {
-                        return null;
-                      }
-
-                      return (
-                        <div className="progress-container">
-                          <div className="progress-label">
-                            <span>
-                              Performance
-                            </span>
-                            <strong>
-                              {percentage.toFixed(
-                                1
-                              )}
-                              %
-                            </strong>
-                          </div>
-
-                          <div className="progress-track">
-                            <div
-                              className={`progress-fill ${getPerformanceClass(
-                                percentage
-                              )}`}
-                              style={{
-                                width: `${percentage}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  <div className="no-result-card">
-                    <TrendingUp size={22} />
-
-                    <div>
-                      <strong>
-                        No result available
-                      </strong>
-
-                      <p>
-                        Your result has not been
-                        published for this examination
-                        yet.
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="modal-footer">
                 <button
                   className="modal-done-button"
                   onClick={() =>
-                    setSelectedExam(null)
+                    setSelectedResult(
+                      null
+                    )
                   }
                 >
                   Close
@@ -1075,12 +1227,16 @@ const Examinations = () => {
   );
 };
 
-const examinationStyles = `
+// ============================================================
+// STYLES
+// ============================================================
+
+const resultStyles = `
   * {
     box-sizing: border-box;
   }
 
-  .examination-page {
+  .result-page {
     min-height: 100vh;
     background: #f5f7fb;
     color: #172033;
@@ -1093,7 +1249,7 @@ const examinationStyles = `
       sans-serif;
   }
 
-  .examination-container {
+  .result-container {
     width: 100%;
     max-width: 1250px;
     margin: 0 auto;
@@ -1276,17 +1432,17 @@ const examinationStyles = `
     color: #4f46e5;
   }
 
-  .upcoming-icon {
-    background: #eaf1ff;
-    color: #1769ff;
-  }
-
-  .completed-icon {
+  .passed-icon {
     background: #eafaf2;
     color: #15945b;
   }
 
-  .result-icon {
+  .failed-icon {
+    background: #fff0ed;
+    color: #c43e29;
+  }
+
+  .average-icon {
     background: #fff7df;
     color: #c48600;
   }
@@ -1306,9 +1462,68 @@ const examinationStyles = `
     color: #182236;
   }
 
+  .performance-banner {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    background: white;
+    border: 1px solid #dcefe4;
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    box-shadow: 0 5px 18px rgba(20, 36, 70, 0.04);
+  }
+
+  .performance-banner-icon {
+    width: 45px;
+    height: 45px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e9f8f0;
+    color: #128052;
+    flex-shrink: 0;
+  }
+
+  .performance-banner-content {
+    flex: 1;
+  }
+
+  .performance-banner-content span {
+    display: block;
+    color: #7b8a80;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .performance-banner-content strong {
+    color: #205f43;
+    font-size: 15px;
+  }
+
+  .cgpa-box {
+    text-align: right;
+    padding-left: 20px;
+    border-left: 1px solid #e1ebe5;
+  }
+
+  .cgpa-box span {
+    display: block;
+    color: #7b8a80;
+    font-size: 10px;
+    margin-bottom: 3px;
+  }
+
+  .cgpa-box strong {
+    color: #128052;
+    font-size: 20px;
+  }
+
   .filter-card {
     display: grid;
-    grid-template-columns: minmax(250px, 1fr) 190px 190px;
+    grid-template-columns: minmax(250px, 1fr) 190px;
     gap: 14px;
     align-items: end;
     background: white;
@@ -1400,13 +1615,13 @@ const examinationStyles = `
     font-size: 13px;
   }
 
-  .exam-list {
+  .result-list {
     display: flex;
     flex-direction: column;
     gap: 13px;
   }
 
-  .exam-card {
+  .result-card {
     display: flex;
     align-items: stretch;
     background: white;
@@ -1420,13 +1635,13 @@ const examinationStyles = `
       border-color 0.2s ease;
   }
 
-  .exam-card:hover {
+  .result-card:hover {
     transform: translateY(-2px);
     border-color: #cddafa;
     box-shadow: 0 12px 28px rgba(20, 36, 70, 0.08);
   }
 
-  .exam-date-box {
+  .result-date-box {
     width: 82px;
     min-width: 82px;
     background: #f0f5ff;
@@ -1437,41 +1652,41 @@ const examinationStyles = `
     border-right: 1px solid #e3eaf8;
   }
 
-  .exam-date-box span {
+  .result-date-box span {
     color: #1769ff;
     font-size: 12px;
     font-weight: 800;
     text-transform: uppercase;
   }
 
-  .exam-date-box strong {
+  .result-date-box strong {
     color: #172033;
     font-size: 27px;
     line-height: 1.15;
     margin-top: 2px;
   }
 
-  .exam-main {
+  .result-main {
     flex: 1;
     min-width: 0;
     padding: 17px 19px;
   }
 
-  .exam-top-row {
+  .result-top-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     gap: 15px;
   }
 
-  .exam-title-row {
+  .result-title-row {
     display: flex;
     align-items: center;
     gap: 9px;
     flex-wrap: wrap;
   }
 
-  .exam-title-row h3 {
+  .result-title-row h3 {
     margin: 0;
     color: #172033;
     font-size: 16px;
@@ -1512,33 +1727,30 @@ const examinationStyles = `
     border-left: 1px solid #dfe5ee;
   }
 
-  .exam-status {
+  .grade-badge {
     display: inline-flex;
     align-items: center;
     gap: 5px;
     border-radius: 20px;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-weight: 800;
+    padding: 7px 11px;
+    font-size: 12px;
+    font-weight: 900;
     white-space: nowrap;
-  }
-
-  .status-upcoming {
-    color: #1769ff;
-    background: #eaf1ff;
-  }
-
-  .status-result {
-    color: #128052;
     background: #e9f8f0;
+    color: #128052;
   }
 
-  .status-completed {
-    color: #667085;
-    background: #f0f2f5;
+  .grade-badge.performance-average {
+    background: #fff7df;
+    color: #a36d00;
   }
 
-  .exam-details-row {
+  .grade-badge.performance-low {
+    background: #fff0ed;
+    color: #c43e29;
+  }
+
+  .result-details-row {
     display: flex;
     align-items: center;
     gap: 19px;
@@ -1560,74 +1772,67 @@ const examinationStyles = `
     color: #8996a9;
   }
 
-  .exam-bottom-row {
-    min-height: 27px;
+  .result-bottom-row {
+    min-height: 38px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 15px;
-    margin-top: 12px;
+    margin-top: 13px;
   }
 
-  .exam-countdown {
-    display: inline-flex;
-    padding: 5px 9px;
-    border-radius: 7px;
-    background: #f3f6fa;
-    color: #657287;
-    font-size: 11px;
-    font-weight: 700;
+  .percentage-section {
+    flex: 1;
+    max-width: 500px;
   }
 
-  .countdown-today {
-    background: #fff0ed;
-    color: #c43e29;
-  }
-
-  .countdown-soon {
-    background: #fff7df;
-    color: #a36d00;
-  }
-
-  .result-preview {
+  .percentage-label {
     display: flex;
-    align-items: center;
-    gap: 9px;
-    font-size: 12px;
-    color: #6b788d;
+    justify-content: space-between;
+    color: #718073;
+    font-size: 11px;
+    margin-bottom: 6px;
   }
 
-  .result-preview .result-grade {
-    min-width: 27px;
-    height: 27px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 7px;
-    font-weight: 900;
-    background: #e9f8f0;
-    color: #128052;
+  .percentage-label strong {
+    color: #205f43;
   }
 
-  .performance-average .result-grade {
-    background: #fff7df;
-    color: #a36d00;
+  .progress-track {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 20px;
+    background: #e1e9e4;
   }
 
-  .performance-low .result-grade {
-    background: #fff0ed;
-    color: #c43e29;
+  .progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.3s ease;
   }
 
-  .result-pending {
+  .progress-fill.performance-good {
+    background: #15945b;
+  }
+
+  .progress-fill.performance-average {
+    background: #c48600;
+  }
+
+  .progress-fill.performance-low {
+    background: #c43e29;
+  }
+
+  .percentage-unavailable {
     color: #8a95a7;
     font-size: 12px;
   }
 
-  .exam-view {
+  .view-result {
     color: #1769ff;
     font-size: 12px;
     font-weight: 700;
+    white-space: nowrap;
   }
 
   .empty-state {
@@ -1673,7 +1878,7 @@ const examinationStyles = `
     font-size: 13px;
   }
 
-  .examination-loading {
+  .result-loading {
     min-height: 70vh;
     display: flex;
     align-items: center;
@@ -1692,12 +1897,12 @@ const examinationStyles = `
     margin-bottom: 16px;
   }
 
-  .examination-loading h3 {
+  .result-loading h3 {
     margin: 0 0 6px;
     color: #243148;
   }
 
-  .examination-loading p {
+  .result-loading p {
     margin: 0;
     color: #7d899d;
     font-size: 13px;
@@ -1715,7 +1920,7 @@ const examinationStyles = `
     overflow-y: auto;
   }
 
-  .exam-modal {
+  .result-modal {
     width: 100%;
     max-width: 650px;
     background: white;
@@ -1847,17 +2052,7 @@ const examinationStyles = `
     margin-bottom: 7px;
   }
 
-  .large-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    border-radius: 9px;
-    padding: 8px 11px;
-    font-size: 12px;
-    font-weight: 800;
-  }
-
-  .result-card {
+  .result-detail-card {
     margin-top: 20px;
     padding: 17px;
     border-radius: 14px;
@@ -1865,14 +2060,14 @@ const examinationStyles = `
     background: #f7fcf9;
   }
 
-  .result-card-header {
+  .result-detail-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 14px;
   }
 
-  .result-card-header h3 {
+  .result-detail-header h3 {
     margin: 0;
     font-size: 16px;
     color: #26354a;
@@ -1889,27 +2084,27 @@ const examinationStyles = `
     color: #128052;
   }
 
-  .result-grid {
+  .result-detail-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 9px;
   }
 
-  .result-grid > div {
+  .result-detail-grid > div {
     background: white;
     border: 1px solid #e3eee7;
     border-radius: 9px;
     padding: 11px;
   }
 
-  .result-grid span {
+  .result-detail-grid span {
     display: block;
     color: #849184;
     font-size: 10px;
     margin-bottom: 4px;
   }
 
-  .result-grid strong {
+  .result-detail-grid strong {
     display: block;
     color: #1d5f42;
     font-size: 14px;
@@ -1929,60 +2124,6 @@ const examinationStyles = `
 
   .progress-label strong {
     color: #1d5f42;
-  }
-
-  .progress-track {
-    height: 7px;
-    overflow: hidden;
-    border-radius: 20px;
-    background: #e1e9e4;
-  }
-
-  .progress-fill {
-    height: 100%;
-    border-radius: inherit;
-    transition: width 0.3s ease;
-  }
-
-  .progress-fill.performance-good {
-    background: #15945b;
-  }
-
-  .progress-fill.performance-average {
-    background: #c48600;
-  }
-
-  .progress-fill.performance-low {
-    background: #c43e29;
-  }
-
-  .no-result-card {
-    display: flex;
-    align-items: flex-start;
-    gap: 11px;
-    margin-top: 20px;
-    padding: 14px;
-    border-radius: 12px;
-    background: #f5f7fa;
-    color: #778397;
-  }
-
-  .no-result-card svg {
-    color: #8c98aa;
-    flex-shrink: 0;
-  }
-
-  .no-result-card strong {
-    display: block;
-    color: #45536a;
-    font-size: 13px;
-    margin-bottom: 3px;
-  }
-
-  .no-result-card p {
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.5;
   }
 
   .modal-footer {
@@ -2006,18 +2147,10 @@ const examinationStyles = `
     .summary-grid {
       grid-template-columns: repeat(2, 1fr);
     }
-
-    .filter-card {
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .search-wrapper {
-      grid-column: 1 / -1;
-    }
   }
 
   @media (max-width: 700px) {
-    .examination-page {
+    .result-page {
       padding: 20px 13px 35px;
     }
 
@@ -2053,19 +2186,23 @@ const examinationStyles = `
       font-size: 20px;
     }
 
+    .performance-banner {
+      align-items: flex-start;
+    }
+
+    .cgpa-box {
+      padding-left: 10px;
+    }
+
     .filter-card {
       grid-template-columns: 1fr;
     }
 
-    .search-wrapper {
-      grid-column: auto;
-    }
-
-    .exam-card {
+    .result-card {
       flex-direction: column;
     }
 
-    .exam-date-box {
+    .result-date-box {
       width: 100%;
       min-width: 0;
       height: 56px;
@@ -2075,38 +2212,35 @@ const examinationStyles = `
       border-bottom: 1px solid #e3eaf8;
     }
 
-    .exam-date-box strong {
+    .result-date-box strong {
       font-size: 23px;
     }
 
-    .exam-top-row {
+    .result-top-row {
       flex-direction: column;
     }
 
-    .exam-status {
-      width: fit-content;
-    }
-
-    .exam-details-row {
+    .result-details-row {
       flex-direction: column;
       align-items: flex-start;
       gap: 9px;
     }
 
-    .exam-bottom-row {
+    .result-bottom-row {
       align-items: flex-start;
       flex-direction: column;
     }
 
-    .result-preview {
-      flex-wrap: wrap;
+    .percentage-section {
+      width: 100%;
+      max-width: none;
     }
 
     .modal-info-grid {
       grid-template-columns: 1fr;
     }
 
-    .result-grid {
+    .result-detail-grid {
       grid-template-columns: 1fr 1fr;
     }
   }
@@ -2129,8 +2263,20 @@ const examinationStyles = `
       font-size: 22px;
     }
 
-    .exam-main {
+    .result-main {
       padding: 15px;
+    }
+
+    .performance-banner {
+      flex-wrap: wrap;
+    }
+
+    .cgpa-box {
+      width: 100%;
+      padding: 10px 0 0;
+      border-left: none;
+      border-top: 1px solid #e1ebe5;
+      text-align: left;
     }
 
     .modal-overlay {
@@ -2144,10 +2290,10 @@ const examinationStyles = `
       padding-right: 17px;
     }
 
-    .result-grid {
+    .result-detail-grid {
       grid-template-columns: 1fr 1fr;
     }
   }
 `;
 
-export default Examinations;
+export default Results;

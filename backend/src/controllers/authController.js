@@ -50,9 +50,9 @@ const isValidEmailFormat = (email) => {
   return emailRegex.test(normalizedEmail);
 };
 
-// ------------------------------------------------------------
+// ============================================================
 // STUDENT EMAIL
-// ------------------------------------------------------------
+// ============================================================
 
 const isStudentEmail = (email) => {
   if (!isValidEmailFormat(email)) {
@@ -64,14 +64,13 @@ const isStudentEmail = (email) => {
     .toLowerCase();
 
   return normalizedEmail.endsWith(
-    `@${STUDENT_EMAIL_DOMAIN}`
+    "@" + STUDENT_EMAIL_DOMAIN
   );
 };
 
-// ------------------------------------------------------------
+// ============================================================
 // STAFF EMAIL
-// ADMIN + FACULTY
-// ------------------------------------------------------------
+// ============================================================
 
 const isStaffEmail = (email) => {
   if (!isValidEmailFormat(email)) {
@@ -83,13 +82,13 @@ const isStaffEmail = (email) => {
     .toLowerCase();
 
   return normalizedEmail.endsWith(
-    `@${STAFF_EMAIL_DOMAIN}`
+    "@" + STAFF_EMAIL_DOMAIN
   );
 };
 
-// ------------------------------------------------------------
+// ============================================================
 // ROLE-BASED EMAIL VALIDATION
-// ------------------------------------------------------------
+// ============================================================
 
 const isValidRoleEmail = (email, role) => {
   const normalizedRole = String(role || "")
@@ -108,13 +107,12 @@ const isValidRoleEmail = (email, role) => {
     return isStudentEmail(email);
   }
 
-  // For unknown roles, reject the email.
   return false;
 };
 
-// ------------------------------------------------------------
+// ============================================================
 // ROLE-BASED EMAIL ERROR MESSAGE
-// ------------------------------------------------------------
+// ============================================================
 
 const getRoleEmailErrorMessage = (role) => {
   const normalizedRole = String(role || "")
@@ -122,18 +120,30 @@ const getRoleEmailErrorMessage = (role) => {
     .toUpperCase();
 
   if (normalizedRole === "ADMIN") {
-    return `Admin must use a Campus360 staff email ending with @${STAFF_EMAIL_DOMAIN}.`;
+    return (
+      "Admin must use a Campus360 staff email ending with @" +
+      STAFF_EMAIL_DOMAIN +
+      "."
+    );
   }
 
   if (
     normalizedRole === "FACULTY" ||
     normalizedRole === "TEACHER"
   ) {
-    return `Faculty must use a Campus360 staff email ending with @${STAFF_EMAIL_DOMAIN}.`;
+    return (
+      "Faculty must use a Campus360 staff email ending with @" +
+      STAFF_EMAIL_DOMAIN +
+      "."
+    );
   }
 
   if (normalizedRole === "STUDENT") {
-    return `Student must use a Campus360 college email ending with @${STUDENT_EMAIL_DOMAIN}.`;
+    return (
+      "Student must use a Campus360 college email ending with @" +
+      STUDENT_EMAIL_DOMAIN +
+      "."
+    );
   }
 
   return "Invalid Campus360 email address.";
@@ -301,10 +311,6 @@ export const registerUser = async (req, res) => {
       .trim()
       .toUpperCase();
 
-    // --------------------------------------------------------
-    // ROLE-BASED EMAIL VALIDATION
-    // --------------------------------------------------------
-
     if (
       !isValidRoleEmail(
         normalizedEmail,
@@ -344,6 +350,7 @@ export const registerUser = async (req, res) => {
         email: normalizedEmail,
         passwordHash,
         role: normalizedRole,
+        mustChangePassword: false,
       },
     });
 
@@ -357,6 +364,8 @@ export const registerUser = async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
+        mustChangePassword:
+          user.mustChangePassword,
       },
     });
   } catch (error) {
@@ -441,10 +450,6 @@ export const loginUser = async (req, res) => {
       const normalizedEmail =
         loginIdentifier.toLowerCase();
 
-      // ------------------------------------------------------
-      // EMAIL FORMAT VALIDATION
-      // ------------------------------------------------------
-
       if (!isValidEmailFormat(normalizedEmail)) {
         return res.status(400).json({
           success: false,
@@ -452,10 +457,6 @@ export const loginUser = async (req, res) => {
             "Please enter a valid email address.",
         });
       }
-
-      // ------------------------------------------------------
-      // FIND USER BY EMAIL
-      // ------------------------------------------------------
 
       user =
         await prisma.user.findUnique({
@@ -471,10 +472,6 @@ export const loginUser = async (req, res) => {
             "Invalid email or password",
         });
       }
-
-      // ------------------------------------------------------
-      // ROLE-BASED EMAIL VALIDATION
-      // ------------------------------------------------------
 
       if (
         !isValidRoleEmail(
@@ -497,19 +494,11 @@ export const loginUser = async (req, res) => {
     // ========================================================
 
     else {
-      // ------------------------------------------------------
-      // PHONE LOGIN IS ONLY FOR STUDENTS
-      // ------------------------------------------------------
-
       const normalizedPhone =
         loginIdentifier.replace(
           /\s+/g,
           ""
         );
-
-      // ------------------------------------------------------
-      // BASIC PHONE VALIDATION
-      // ------------------------------------------------------
 
       if (!/^\d{10}$/.test(normalizedPhone)) {
         return res.status(400).json({
@@ -518,10 +507,6 @@ export const loginUser = async (req, res) => {
             "Please enter a valid 10-digit registered phone number.",
         });
       }
-
-      // ------------------------------------------------------
-      // FIND STUDENT BY REGISTERED PHONE
-      // ------------------------------------------------------
 
       const student =
         await prisma.student.findFirst({
@@ -544,10 +529,6 @@ export const loginUser = async (req, res) => {
 
       user = student.user;
 
-      // ------------------------------------------------------
-      // PHONE LOGIN MUST BE STUDENT ONLY
-      // ------------------------------------------------------
-
       if (
         String(user.role || "")
           .toUpperCase() !== "STUDENT"
@@ -558,10 +539,6 @@ export const loginUser = async (req, res) => {
             "Phone number login is available only for students.",
         });
       }
-
-      // ------------------------------------------------------
-      // VERIFY STUDENT EMAIL DOMAIN
-      // ------------------------------------------------------
 
       if (
         !isValidRoleEmail(
@@ -618,9 +595,7 @@ export const loginUser = async (req, res) => {
         userId: user.id,
         role: user.role,
       },
-
       process.env.JWT_SECRET,
-
       {
         expiresIn: "1d",
       }
@@ -642,6 +617,8 @@ export const loginUser = async (req, res) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
+        mustChangePassword:
+          user.mustChangePassword,
       },
     });
   } catch (error) {
@@ -662,10 +639,7 @@ export const loginUser = async (req, res) => {
 // FORGOT PASSWORD
 // ============================================================
 
-export const forgotPassword = async (
-  req,
-  res
-) => {
+export const forgotPassword = async (req, res) => {
   try {
     const email = String(
       req.body?.email || ""
@@ -694,10 +668,6 @@ export const forgotPassword = async (
       email
     );
 
-    // --------------------------------------------------------
-    // FIND USER FIRST
-    // --------------------------------------------------------
-
     const user =
       await prisma.user.findUnique({
         where: {
@@ -705,7 +675,6 @@ export const forgotPassword = async (
         },
       });
 
-    // Do not reveal whether an email exists.
     if (!user) {
       console.log(
         "Password reset email not registered:",
@@ -718,10 +687,6 @@ export const forgotPassword = async (
           "If an account exists with this email, a verification code has been sent.",
       });
     }
-
-    // --------------------------------------------------------
-    // ROLE-BASED EMAIL VALIDATION
-    // --------------------------------------------------------
 
     if (
       !isValidRoleEmail(
@@ -744,21 +709,12 @@ export const forgotPassword = async (
       });
     }
 
-    // --------------------------------------------------------
-    // GENERATE 6-DIGIT OTP
-    // --------------------------------------------------------
-
     const otp = String(
       crypto.randomInt(100000, 1000000)
     );
 
-    // OTP expires after 10 minutes
     const expiresAt =
       Date.now() + 10 * 60 * 1000;
-
-    // --------------------------------------------------------
-    // STORE OTP
-    // --------------------------------------------------------
 
     passwordResetStore.set(email, {
       otp,
@@ -777,108 +733,59 @@ export const forgotPassword = async (
       new Date(expiresAt).toLocaleString()
     );
 
-    // ========================================================
-    // SEND OTP EMAIL
-    // ========================================================
-
     try {
+      const emailHtml = [
+        '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background: #f5f7fb;">',
+
+        '<div style="background: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e5e7eb;">',
+
+        '<h2 style="color: #1769ff; margin: 0 0 10px;">',
+        "Campus360",
+        "</h2>",
+
+        '<p style="color: #475467; font-size: 15px; line-height: 1.6;">',
+        "You requested to reset your Campus360 account password.",
+        "</p>",
+
+        '<p style="color: #475467; font-size: 15px;">',
+        "Your verification code is:",
+        "</p>",
+
+        '<div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1769ff; background: #edf4ff; padding: 18px; text-align: center; border-radius: 12px; margin: 20px 0;">',
+        otp,
+        "</div>",
+
+        '<p style="color: #667085; font-size: 13px; line-height: 1.6;">',
+        "This verification code is valid for 10 minutes.",
+        "</p>",
+
+        '<p style="color: #667085; font-size: 13px; line-height: 1.6;">',
+        "If you did not request a password reset, you can safely ignore this email.",
+        "</p>",
+
+        '<hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 25px 0;">',
+
+        '<p style="color: #98a2b3; font-size: 12px;">',
+        "Campus360 • College Management Portal",
+        "</p>",
+
+        "</div>",
+        "</div>",
+      ].join("");
+
       const mailInfo =
         await mailTransporter.sendMail({
-          from: `"Campus360" <${process.env.MAIL_USER}>`,
+          from:
+            '"Campus360" <' +
+            process.env.MAIL_USER +
+            ">",
 
           to: email,
 
           subject:
             "Campus360 Password Reset OTP",
 
-          html: `
-            <div style="
-              font-family: Arial, sans-serif;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 30px;
-              background: #f5f7fb;
-            ">
-
-              <div style="
-                background: #ffffff;
-                border-radius: 16px;
-                padding: 30px;
-                border: 1px solid #e5e7eb;
-              ">
-
-                <h2 style="
-                  color: #1769ff;
-                  margin: 0 0 10px;
-                ">
-                  Campus360
-                </h2>
-
-                <p style="
-                  color: #475467;
-                  font-size: 15px;
-                  line-height: 1.6;
-                ">
-                  You requested to reset your
-                  Campus360 account password.
-                </p>
-
-                <p style="
-                  color: #475467;
-                  font-size: 15px;
-                ">
-                  Your verification code is:
-                </p>
-
-                <div style="
-                  font-size: 32px;
-                  font-weight: bold;
-                  letter-spacing: 8px;
-                  color: #1769ff;
-                  background: #edf4ff;
-                  padding: 18px;
-                  text-align: center;
-                  border-radius: 12px;
-                  margin: 20px 0;
-                ">
-                  ${otp}
-                </div>
-
-                <p style="
-                  color: #667085;
-                  font-size: 13px;
-                  line-height: 1.6;
-                ">
-                  This verification code is valid
-                  for 10 minutes.
-                </p>
-
-                <p style="
-                  color: #667085;
-                  font-size: 13px;
-                  line-height: 1.6;
-                ">
-                  If you did not request a password
-                  reset, you can safely ignore this
-                  email.
-                </p>
-
-                <hr style="
-                  border: 0;
-                  border-top: 1px solid #e5e7eb;
-                  margin: 25px 0;
-                ">
-
-                <p style="
-                  color: #98a2b3;
-                  font-size: 12px;
-                ">
-                  Campus360 • College Management Portal
-                </p>
-
-              </div>
-            </div>
-          `,
+          html: emailHtml,
         });
 
       console.log(
@@ -974,10 +881,7 @@ export const forgotPassword = async (
 // VERIFY PASSWORD RESET OTP
 // ============================================================
 
-export const verifyResetOtp = async (
-  req,
-  res
-) => {
+export const verifyResetOtp = async (req, res) => {
   try {
     const email = String(
       req.body?.email || ""
@@ -1005,10 +909,6 @@ export const verifyResetOtp = async (
       });
     }
 
-    // --------------------------------------------------------
-    // FIND USER
-    // --------------------------------------------------------
-
     const user =
       await prisma.user.findUnique({
         where: {
@@ -1023,10 +923,6 @@ export const verifyResetOtp = async (
           "OTP is invalid or has expired.",
       });
     }
-
-    // --------------------------------------------------------
-    // ROLE-BASED EMAIL VALIDATION
-    // --------------------------------------------------------
 
     if (
       !isValidRoleEmail(
@@ -1084,10 +980,6 @@ export const verifyResetOtp = async (
       });
     }
 
-    // --------------------------------------------------------
-    // CREATE RESET TOKEN
-    // --------------------------------------------------------
-
     const resetToken = jwt.sign(
       {
         userId: resetData.userId,
@@ -1130,10 +1022,7 @@ export const verifyResetOtp = async (
 // RESET PASSWORD
 // ============================================================
 
-export const resetPassword = async (
-  req,
-  res
-) => {
+export const resetPassword = async (req, res) => {
   try {
     const {
       resetToken,
@@ -1171,10 +1060,6 @@ export const resetPassword = async (
       });
     }
 
-    // --------------------------------------------------------
-    // VERIFY RESET TOKEN
-    // --------------------------------------------------------
-
     let decoded;
 
     try {
@@ -1203,10 +1088,6 @@ export const resetPassword = async (
       });
     }
 
-    // --------------------------------------------------------
-    // FIND USER
-    // --------------------------------------------------------
-
     const user =
       await prisma.user.findUnique({
         where: {
@@ -1222,10 +1103,6 @@ export const resetPassword = async (
       });
     }
 
-    // --------------------------------------------------------
-    // VERIFY ROLE-BASED EMAIL
-    // --------------------------------------------------------
-
     if (
       !isValidRoleEmail(
         user.email,
@@ -1239,19 +1116,11 @@ export const resetPassword = async (
       });
     }
 
-    // --------------------------------------------------------
-    // HASH NEW PASSWORD
-    // --------------------------------------------------------
-
     const passwordHash =
       await bcrypt.hash(
         newPassword,
         10
       );
-
-    // --------------------------------------------------------
-    // UPDATE PASSWORD
-    // --------------------------------------------------------
 
     await prisma.user.update({
       where: {
@@ -1260,6 +1129,7 @@ export const resetPassword = async (
 
       data: {
         passwordHash,
+        mustChangePassword: false,
       },
     });
 
@@ -1278,6 +1148,152 @@ export const resetPassword = async (
       success: false,
       message:
         "Unable to reset password.",
+    });
+  }
+};
+
+// ============================================================
+// CHANGE PASSWORD
+// ============================================================
+
+export const changePassword = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Authentication required.",
+      });
+    }
+
+    const {
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    } = req.body;
+
+    if (
+      !currentPassword ||
+      !newPassword ||
+      !confirmPassword
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "All password fields are required.",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password must be at least 8 characters long.",
+      });
+    }
+
+    if (
+      newPassword !== confirmPassword
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password and confirm password do not match.",
+      });
+    }
+
+    if (
+      currentPassword === newPassword
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "New password must be different from the current password.",
+      });
+    }
+
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "User account not found.",
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your account is inactive.",
+      });
+    }
+
+    const currentPasswordValid =
+      await bcrypt.compare(
+        currentPassword,
+        user.passwordHash
+      );
+
+    if (!currentPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Current password is incorrect.",
+      });
+    }
+
+    const passwordHash =
+      await bcrypt.hash(
+        newPassword,
+        10
+      );
+
+    const updatedUser =
+      await prisma.user.update({
+        where: {
+          id: userId,
+        },
+
+        data: {
+          passwordHash,
+          mustChangePassword: false,
+        },
+      });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Password changed successfully.",
+
+      user: {
+        id: updatedUser.id,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        mustChangePassword:
+          updatedUser.mustChangePassword,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Change password error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to change password.",
     });
   }
 };

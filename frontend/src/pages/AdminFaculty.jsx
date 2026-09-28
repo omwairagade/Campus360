@@ -29,6 +29,7 @@ import {
   AlertCircle,
   BriefcaseBusiness,
   Layers3,
+  Plus,
 } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
@@ -36,6 +37,7 @@ import { useNavigate } from "react-router-dom";
 import {
   apiGet,
   apiPatch,
+  apiPost,
 } from "../api";
 
 /* ============================================================
@@ -203,6 +205,31 @@ function AdminFaculty() {
   ] = useState(null);
 
   const [
+    showCreateModal,
+    setShowCreateModal,
+  ] = useState(false);
+
+  const [
+    creatingFaculty,
+    setCreatingFaculty,
+  ] = useState(false);
+
+  const [
+    createFacultyForm,
+    setCreateFacultyForm,
+  ] = useState({
+    firstName: "",
+    lastName: "",
+    employeeId: "",
+    departmentId: "",
+  });
+
+  const [
+    createdCredentials,
+    setCreatedCredentials,
+  ] = useState(null);
+
+  const [
     search,
     setSearch,
   ] = useState("");
@@ -271,6 +298,77 @@ function AdminFaculty() {
     success,
     setSuccess,
   ] = useState("");
+
+  const handleCreateFaculty = async (event) => {
+    event.preventDefault();
+
+    const firstName = createFacultyForm.firstName.trim();
+    const lastName = createFacultyForm.lastName.trim();
+    const employeeId = createFacultyForm.employeeId.trim();
+    const selectedDepartmentId = createFacultyForm.departmentId;
+
+    if (!firstName || !lastName || !employeeId || !selectedDepartmentId) {
+      setError("Please fill all faculty account fields.");
+      return;
+    }
+
+    try {
+      setCreatingFaculty(true);
+      setError("");
+      setSuccess("");
+      setCreatedCredentials(null);
+
+      const data = await apiPost("/faculty", {
+        firstName,
+        lastName,
+        employeeId,
+        departmentId: Number(selectedDepartmentId),
+      });
+
+const credentials = {
+  email:
+    data?.credentials?.email ||
+    data?.credentials?.collegeEmail ||
+    data?.email ||
+    data?.collegeEmail ||
+    `${employeeId}@campus360.com`,
+  temporaryPassword:
+    data?.credentials?.temporaryPassword ||
+    data?.credentials?.password ||
+    data?.temporaryPassword ||
+    data?.password ||
+    "Campus@123",
+};
+
+      setCreatedCredentials(credentials);
+      setSuccess(
+        data?.message ||
+          "Faculty account created successfully. Provide the temporary credentials to the faculty member."
+      );
+
+      setCreateFacultyForm({
+        firstName: "",
+        lastName: "",
+        employeeId: "",
+        departmentId: "",
+      });
+
+      await fetchFaculty(true);
+    } catch (err) {
+      console.error("Create faculty error:", err);
+
+      if (handleAuthError(err, navigate)) {
+        return;
+      }
+
+      setError(
+        err?.message ||
+          "Failed to create faculty account."
+      );
+    } finally {
+      setCreatingFaculty(false);
+    }
+  };
 
   /* ==========================================================
      FETCH FACULTY
@@ -1013,13 +1111,35 @@ function AdminFaculty() {
 
           </div>
 
-          <button
-            type="button"
-            onClick={() =>
-              fetchFaculty(
-                true
-              )
-            }
+          <div className="flex items-center gap-2">
+
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setSuccess("");
+                setCreatedCredentials(null);
+                setCreateFacultyForm({
+                  firstName: "",
+                  lastName: "",
+                  employeeId: "",
+                  departmentId: "",
+                });
+                setShowCreateModal(true);
+              }}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 sm:px-4"
+            >
+              <Plus size={17} />
+              <span className="hidden sm:inline">Add Faculty</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                fetchFaculty(
+                  true
+                )
+              }
             disabled={
               refreshing
             }
@@ -1041,7 +1161,9 @@ function AdminFaculty() {
                 : "Refresh"}
             </span>
 
-          </button>
+            </button>
+
+          </div>
 
         </div>
 
@@ -1936,6 +2058,23 @@ function AdminFaculty() {
 
       </main>
 
+      {showCreateModal && (
+        <CreateFacultyModal
+          departments={departments}
+          form={createFacultyForm}
+          setForm={setCreateFacultyForm}
+          loading={creatingFaculty}
+          credentials={createdCredentials}
+          onSubmit={handleCreateFaculty}
+          onClose={() => {
+            if (!creatingFaculty) {
+              setShowCreateModal(false);
+              setCreatedCredentials(null);
+            }
+          }}
+        />
+      )}
+
       {/* ======================================================
           FACULTY DETAILS MODAL
       ====================================================== */}
@@ -2770,6 +2909,210 @@ function CardInfo({
 /* ============================================================
    DETAILS MODAL
 ============================================================ */
+
+function CreateFacultyModal({
+  departments,
+  form,
+  setForm,
+  loading,
+  credentials,
+  onSubmit,
+  onClose,
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+
+      <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
+              Faculty Account
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-slate-800">
+              Add Faculty
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="max-h-[80vh] overflow-y-auto p-5 sm:p-6">
+          {credentials ? (
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-green-200 bg-green-50 p-5">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 shrink-0 text-green-600" size={21} />
+                  <div>
+                    <p className="font-bold text-green-800">Faculty account created</p>
+                    <p className="mt-1 text-sm leading-6 text-green-700">
+                      Give these temporary credentials to the faculty member. They must change the password after first login.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">College Email</p>
+                  <p className="mt-2 break-all text-sm font-bold text-slate-800">
+                    {credentials.email}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Temporary Password</p>
+                  <p className="mt-2 text-sm font-bold text-slate-800">
+                    {credentials.temporaryPassword || "Campus@123"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end border-t border-slate-200 pt-5">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={onSubmit} className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-bold text-slate-700">First Name</span>
+                  <input
+                    type="text"
+                    value={form.firstName}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        firstName: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter first name"
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    disabled={loading}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-bold text-slate-700">Last Name</span>
+                  <input
+                    type="text"
+                    value={form.lastName}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        lastName: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter last name"
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    disabled={loading}
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="text-sm font-bold text-slate-700">Employee ID</span>
+                <input
+                  type="text"
+                  value={form.employeeId}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      employeeId: event.target.value,
+                    }))
+                  }
+                  placeholder="Example: FAC001"
+                  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={loading}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  The college email will be generated as EmployeeID@campus360.com.
+                </p>
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-bold text-slate-700">Department</span>
+                <select
+                  value={form.departmentId}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      departmentId: event.target.value,
+                    }))
+                  }
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={loading}
+                >
+                  <option value="">Select department</option>
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.code
+                        ? `${department.code} — ${department.name}`
+                        : department.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
+                  Login Credentials
+                </p>
+                <p className="mt-2 text-sm leading-6 text-blue-800">
+                  The system will automatically use <strong>Campus@123</strong> as the temporary password. The faculty member must change it on first login.
+                </p>
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} />
+                      Create Faculty
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
 
 function FacultyDetailsModal({
   faculty,
