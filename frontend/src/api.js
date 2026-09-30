@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "https://campus360-backend-gbf0.onrender.com/api";
 
 /* =========================================================
    AUTHENTICATION TOKEN
