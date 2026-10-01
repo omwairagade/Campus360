@@ -6,9 +6,9 @@ import { loginUser } from "../api";
 function Login() {
 const navigate = useNavigate();
 console.log(
-    "reCAPTCHA site key loaded:",
-    Boolean(import.meta.env.VITE_RECAPTCHA_SITE_KEY)
-  );
+    "reCAPTCHA key suffix:",
+  import.meta.env.VITE_RECAPTCHA_SITE_KEY?.slice(-6)
+);
 
 const [identifier, setIdentifier] = useState("");
 const [password, setPassword] = useState("");
