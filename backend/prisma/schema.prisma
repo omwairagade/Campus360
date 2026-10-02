@@ -18,38 +18,35 @@ model User {
   passwordHash       String
   role               UserRole
   isActive           Boolean  @default(true)
-  mustChangePassword Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
-
-  faculty Faculty?
-  student Student?
+  mustChangePassword Boolean  @default(false)
+  faculty            Faculty?
+  student            Student?
 }
 
 model Student {
-  id               Int       @id @default(autoincrement())
-  userId           Int       @unique
-  enrollmentNumber String    @unique
+  id               Int                    @id @default(autoincrement())
+  userId           Int                    @unique
+  enrollmentNumber String                 @unique
   semester         Int
   admissionYear    Int
   phone            String?
   dateOfBirth      DateTime?
-  batch            String?
-  division         String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
   departmentId     Int
   programId        Int
-
-  submissions AssignmentSubmission[]
-  attendance  AttendanceRecord[]
-  enrollments CourseEnrollment[]
-  results     ExamResult[]
-  fees        Fee[]
-
-  departmentRel Department @relation("StudentDepartment", fields: [departmentId], references: [id])
-  programRel    Program    @relation("StudentProgram", fields: [programId], references: [id])
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batch            String?
+  division         String?
+  submissions      AssignmentSubmission[]
+  attendance       AttendanceRecord[]
+  enrollments      CourseEnrollment[]
+  results          ExamResult[]
+  fees             Fee[]
+  departmentRel    Department             @relation("StudentDepartment", fields: [departmentId], references: [id])
+  programRel       Program                @relation("StudentProgram", fields: [programId], references: [id])
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([batch])
   @@index([division])
@@ -59,64 +56,60 @@ model Student {
 }
 
 model Faculty {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @unique
-  employeeId   String   @unique
+  id           Int              @id @default(autoincrement())
+  userId       Int              @unique
+  employeeId   String           @unique
   designation  String?
   departmentId Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  assignments Assignment[]
-  courses     Course[]
-  exams       Exam[]
-  notices     Notice[]         @relation("FacultyCreatedNotices")
-  department  Department       @relation(fields: [departmentId], references: [id])
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  timetable   TimetableEntry[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  assignments  Assignment[]
+  courses      Course[]
+  exams        Exam[]
+  department   Department       @relation(fields: [departmentId], references: [id])
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notices      Notice[]         @relation("FacultyCreatedNotices")
+  timetable    TimetableEntry[]
 }
 
 model Department {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  code        String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  code          String         @unique
+  description   String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   courses       Course[]
   faculty       Faculty[]
+  feeStructures FeeStructure[]
   programs      Program[]
   students      Student[]      @relation("StudentDepartment")
-  feeStructures FeeStructure[]
 }
 
 model Program {
-  id            Int      @id @default(autoincrement())
+  id            Int            @id @default(autoincrement())
   name          String
-  code          String   @unique
+  code          String         @unique
   durationYears Int
   departmentId  Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   courses       Course[]
+  feeStructures FeeStructure[]
   department    Department     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   students      Student[]      @relation("StudentProgram")
-  feeStructures FeeStructure[]
 
   @@index([departmentId])
 }
 
 model AcademicYear {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  startYear Int
-  endYear   Int
-  isActive  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  startYear     Int
+  endYear       Int
+  isActive      Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   feeStructures FeeStructure[]
 
   @@index([startYear])
@@ -125,24 +118,23 @@ model AcademicYear {
 }
 
 model FeeStructure {
-  id             Int       @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   departmentId   Int
   programId      Int
   academicYearId Int
   semester       Int
   name           String
   description    String?
-  totalAmount    Int       @default(0)
+  totalAmount    Int            @default(0)
   dueDate        DateTime?
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  department   Department     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  program      Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
-  academicYear AcademicYear   @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
-  components   FeeComponent[]
-  fees         Fee[]
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  fees           Fee[]
+  components     FeeComponent[]
+  academicYear   AcademicYear   @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  department     Department     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  program        Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
 
   @@unique([programId, academicYearId, semester])
   @@index([departmentId])
@@ -153,33 +145,31 @@ model FeeStructure {
 }
 
 model FeeComponent {
-  id             Int      @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   feeStructureId Int
   name           String
   description    String?
   amount         Int
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
 
   @@index([feeStructureId])
 }
 
 model Course {
-  id           Int      @id @default(autoincrement())
-  code         String   @unique
-  name         String
-  description  String?
-  credits      Int
-  semester     Int
-  type         String
-  departmentId Int
-  programId    Int
-  facultyId    Int?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
+  id            Int                @id @default(autoincrement())
+  code          String             @unique
+  name          String
+  description   String?
+  credits       Int
+  semester      Int
+  type          String
+  departmentId  Int
+  programId     Int
+  facultyId     Int?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
   assignments   Assignment[]
   attendance    AttendanceRecord[]
   department    Department         @relation(fields: [departmentId], references: [id])
@@ -188,8 +178,8 @@ model Course {
   enrollments   CourseEnrollment[]
   exams         Exam[]
   results       ExamResult[]
-  timetable     TimetableEntry[]
   noticeTargets Notice[]           @relation("NoticeTargetCourse")
+  timetable     TimetableEntry[]
 }
 
 model CourseEnrollment {
@@ -198,9 +188,8 @@ model CourseEnrollment {
   courseId        Int
   enrolledAt      DateTime @default(now())
   progressPercent Int      @default(0)
-
-  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, courseId])
 }
@@ -213,9 +202,8 @@ model AttendanceRecord {
   status    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, courseId, date])
 }
@@ -232,9 +220,8 @@ model TimetableEntry {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   batch     String?
-
-  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  faculty Faculty? @relation(fields: [facultyId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  faculty   Faculty? @relation(fields: [facultyId], references: [id])
 
   @@index([dayOfWeek])
   @@index([courseId])
@@ -243,16 +230,15 @@ model TimetableEntry {
 }
 
 model Assignment {
-  id          Int      @id @default(autoincrement())
+  id          Int                    @id @default(autoincrement())
   title       String
   description String?
   dueDate     DateTime
-  maxMarks    Int      @default(100)
+  maxMarks    Int                    @default(100)
   courseId    Int
   facultyId   Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
   course      Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
   faculty     Faculty?               @relation(fields: [facultyId], references: [id])
   submissions AssignmentSubmission[]
@@ -263,24 +249,21 @@ model Assignment {
 }
 
 model AssignmentSubmission {
-  id            Int       @id @default(autoincrement())
+  id            Int        @id @default(autoincrement())
   assignmentId  Int
   studentId     Int
   submittedAt   DateTime?
-  status        String    @default("PENDING")
+  status        String     @default("PENDING")
   marksObtained Int?
   remarks       String?
-
-  fileName String?
-  fileUrl  String?
-  fileSize Int?
-  fileType String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  fileName      String?
+  fileSize      Int?
+  fileType      String?
+  fileUrl       String?
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student       Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([assignmentId, studentId])
   @@index([studentId])
@@ -288,19 +271,18 @@ model AssignmentSubmission {
 }
 
 model Exam {
-  id        Int      @id @default(autoincrement())
+  id        Int          @id @default(autoincrement())
   title     String
   examType  String
   examDate  DateTime
-  maxMarks  Int      @default(100)
+  maxMarks  Int          @default(100)
   courseId  Int
   facultyId Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  course  Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  faculty Faculty?     @relation(fields: [facultyId], references: [id])
-  results ExamResult[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  course    Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  faculty   Faculty?     @relation(fields: [facultyId], references: [id])
+  results   ExamResult[]
 
   @@index([courseId])
   @@index([facultyId])
@@ -317,10 +299,9 @@ model ExamResult {
   gradePoint    Float?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
-  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([examId, studentId])
   @@index([studentId])
@@ -328,20 +309,19 @@ model ExamResult {
 }
 
 model Fee {
-  id             Int      @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   studentId      Int
-  feeStructureId Int?
   title          String
   totalAmount    Int
-  paidAmount     Int      @default(0)
+  paidAmount     Int           @default(0)
   dueDate        DateTime
-  status         String   @default("PENDING")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  feeStructure FeeStructure? @relation(fields: [feeStructureId], references: [id], onDelete: SetNull)
-  payments     FeePayment[]
+  status         String        @default("PENDING")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  feeStructureId Int?
+  feeStructure   FeeStructure? @relation(fields: [feeStructureId], references: [id])
+  student        Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  payments       FeePayment[]
 
   @@index([studentId])
   @@index([feeStructureId])
@@ -357,33 +337,30 @@ model FeePayment {
   paymentMethod String
   transactionId String   @unique
   createdAt     DateTime @default(now())
-
-  fee Fee @relation(fields: [feeId], references: [id], onDelete: Cascade)
+  fee           Fee      @relation(fields: [feeId], references: [id], onDelete: Cascade)
 
   @@index([feeId])
   @@index([paymentDate])
 }
 
 model Notice {
-  id          Int       @id @default(autoincrement())
-  title       String
-  message     String
-  category    String    @default("GENERAL")
-  priority    String    @default("NORMAL")
-  isPublished Boolean   @default(true)
-  publishedAt DateTime  @default(now())
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  targetSemester     Int?
-  targetCourseId     Int?
-  targetBatch        String?
-  targetDivision     String?
+  id                 Int       @id @default(autoincrement())
+  title              String
+  message            String
+  category           String    @default("GENERAL")
+  priority           String    @default("NORMAL")
+  isPublished        Boolean   @default(true)
+  publishedAt        DateTime  @default(now())
+  expiresAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
   createdByFacultyId Int?
-
-  targetCourse Course?  @relation("NoticeTargetCourse", fields: [targetCourseId], references: [id], onDelete: SetNull)
-  createdBy    Faculty? @relation("FacultyCreatedNotices", fields: [createdByFacultyId], references: [id], onDelete: SetNull)
+  targetBatch        String?
+  targetCourseId     Int?
+  targetDivision     String?
+  targetSemester     Int?
+  createdBy          Faculty?  @relation("FacultyCreatedNotices", fields: [createdByFacultyId], references: [id])
+  targetCourse       Course?   @relation("NoticeTargetCourse", fields: [targetCourseId], references: [id])
 
   @@index([category])
   @@index([priority])
@@ -397,15 +374,15 @@ model Notice {
   @@index([createdByFacultyId])
 }
 
-enum UserRole {
-  STUDENT
-  FACULTY
-  ADMIN
-}
-
 model PaymentSetting {
   id            Int      @id @default(autoincrement())
   onlinePayment Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+enum UserRole {
+  STUDENT
+  FACULTY
+  ADMIN
 }

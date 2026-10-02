@@ -26,6 +26,9 @@ import { apiGet, logoutUser } from "../api";
 const RAZORPAY_SCRIPT_URL =
   "https://checkout.razorpay.com/v1/checkout.js";
 
+const API_BASE_URL =
+  "https://campus360-backend-gbf0.onrender.com/api";
+
 const loadRazorpayScript = () =>
   new Promise((resolve) => {
     const existingScript = document.querySelector(
@@ -169,13 +172,6 @@ const Fees = () => {
           err
         );
 
-        /*
-         * Keep the UI usable if the setting
-         * request fails.
-         *
-         * The backend create-order endpoint
-         * must still enforce the setting.
-         */
         setOnlinePayment(true);
       } finally {
         setPaymentSettingLoading(false);
@@ -312,8 +308,6 @@ const Fees = () => {
   const handlePayNow = async (fee) => {
     if (!fee?.id) return;
 
-    // Prevent payment if admin has disabled
-    // online student payments.
     if (!onlinePayment) {
       setPaymentError(
         "Online payments are currently disabled by the administrator."
@@ -356,7 +350,7 @@ const Fees = () => {
 
       const orderResponse =
         await fetch(
-          `http://localhost:5000/api/fees/${fee.id}/create-order`,
+          `${API_BASE_URL}/fees/${fee.id}/create-order`,
           {
             method: "POST",
 
@@ -439,7 +433,7 @@ const Fees = () => {
 
             const verifyResponse =
               await fetch(
-                "http://localhost:5000/api/fees/verify-payment",
+                `${API_BASE_URL}/fees/verify-payment`,
                 {
                   method: "POST",
 
