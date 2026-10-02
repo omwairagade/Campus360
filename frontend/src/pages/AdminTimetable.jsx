@@ -1802,187 +1802,146 @@ async function loadCourses() {
           {/* ================================================== */}
 
           <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            {/* Department */}
-            <div className="relative">
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                Department
-              </label>
+{/* Department */}
+<div className="relative">
+  <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+    Department
+  </label>
 
-              <select
-                value={
-                  departmentFilter
-                }
-                onChange={
-                  handleDepartmentFilterChange
-                }
-                className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="ALL">
-                  All Departments
-                </option>
+  <select
+    value={departmentFilter}
+    onChange={handleDepartmentFilterChange}
+    className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+  >
+    <option value="ALL">
+      All Departments
+    </option>
 
-                {departments.map(
-                  (department) => (
-                    <option
-                      key={
-                        department.id
-                      }
-                      value={
-                        department.id
-                      }
-                    >
-                      {department.code
-                        ? `${department.code} — `
-                        : ""}
-                      {department.name}
-                    </option>
-                  )
-                )}
-              </select>
+    {departments.map((department) => (
+      <option
+        key={department.id}
+        value={department.id}
+      >
+        {department.code
+          ? `${department.code} — `
+          : ""}
+        {department.name}
+      </option>
+    ))}
+  </select>
 
-              <ChevronDown
-                size={18}
-                className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
-              />
-            </div>
+  <ChevronDown
+    size={18}
+    className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
+  />
+</div>
 
-            {/* Program */}
-            <div className="relative">
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                Program
-              </label>
+{/* Program */}
+<div className="relative">
+  <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+    Program
+  </label>
 
-              <select
-                value={
-                  programFilter
-                }
-                onChange={
-                  handleProgramFilterChange
-                }
-                disabled={
-                  departmentFilter ===
-                    "ALL" &&
-                  programs.length ===
-                    0
-                }
-                className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="ALL">
-                  All Programs
-                </option>
+  <select
+    value={programFilter}
+    onChange={handleProgramFilterChange}
+    disabled={departmentFilter === "ALL"}
+    className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+  >
+    <option value="ALL">
+      {departmentFilter === "ALL"
+        ? "Select Department First"
+        : "All Programs"}
+    </option>
 
-                {programs.map(
-                  (program) => (
-                    <option
-                      key={
-                        program.id
-                      }
-                      value={
-                        program.id
-                      }
-                    >
-                      {program.code
-                        ? `${program.code} — `
-                        : ""}
-                      {program.name}
-                    </option>
-                  )
-                )}
-              </select>
+    {programs.map((program) => (
+      <option
+        key={program.id}
+        value={program.id}
+      >
+        {program.code
+          ? `${program.code} — `
+          : ""}
+        {program.name}
+      </option>
+    ))}
+  </select>
 
-              <ChevronDown
-                size={18}
-                className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
-              />
-            </div>
+  <ChevronDown
+    size={18}
+    className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
+  />
+</div>
 
-            {/* Semester */}
-            <div className="relative">
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                Semester
-              </label>
+{/* Semester */}
+<div className="relative">
+  <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+    Semester
+  </label>
 
-              <select
-                value={
-                  semesterFilter
-                }
-                onChange={
-                  handleSemesterFilterChange
-                }
-                className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="ALL">
-                  All Semesters
-                </option>
+  <select
+    value={semesterFilter}
+    onChange={handleSemesterFilterChange}
+    disabled={programFilter === "ALL"}
+    className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+  >
+    <option value="ALL">
+      {programFilter === "ALL"
+        ? "Select Program First"
+        : "All Semesters"}
+    </option>
 
-                {semesters.map(
-                  (semester) => (
-                    <option
-                      key={
-                        semester
-                      }
-                      value={
-                        semester
-                      }
-                    >
-                      Semester{" "}
-                      {semester}
-                    </option>
-                  )
-                )}
-              </select>
+    {semesters.map((semester) => (
+      <option
+        key={semester}
+        value={semester}
+      >
+        Semester {semester}
+      </option>
+    ))}
+  </select>
 
-              <ChevronDown
-                size={18}
-                className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
-              />
-            </div>
+  <ChevronDown
+    size={18}
+    className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
+  />
+</div>
 
-            {/* Course */}
-            <div className="relative">
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">
-                Course
-              </label>
+{/* Course */}
+<div className="relative">
+  <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+    Course
+  </label>
 
-              <select
-                value={
-                  courseFilter
-                }
-                onChange={(event) =>
-                  setCourseFilter(
-                    event.target.value
-                  )
-                }
-                className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="ALL">
-                  All Courses
-                </option>
+  <select
+    value={courseFilter}
+    onChange={(event) =>
+      setCourseFilter(event.target.value)
+    }
+    disabled={semesterFilter === "ALL"}
+    className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+  >
+    <option value="ALL">
+      {semesterFilter === "ALL"
+        ? "Select Semester First"
+        : "All Courses"}
+    </option>
 
-                {filteredCourses.map(
-                  (course) => (
-                    <option
-                      key={
-                        course.id
-                      }
-                      value={
-                        course.id
-                      }
-                    >
-                      {course.code} —{" "}
-                      {
-                        course.name
-                      }
-                    </option>
-                  )
-                )}
-              </select>
+    {filteredCourses.map((course) => (
+      <option
+        key={course.id}
+        value={course.id}
+      >
+        {course.code} — {course.name}
+      </option>
+    ))}
+  </select>
 
-              <ChevronDown
-                size={18}
-                className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
-              />
-            </div>
+  <ChevronDown
+    size={18}
+    className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
+  />
+</div>
           </div>
 
           {/* ================================================== */}
