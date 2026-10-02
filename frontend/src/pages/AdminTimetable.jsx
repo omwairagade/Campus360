@@ -471,18 +471,12 @@ export default function AdminTimetable() {
 
   async function loadCourses() {
     try {
-      const data = await apiGet(
-        "/admin/courses"
-      );
+      const data = await apiGet("/courses");
 
       setCourses(
-        Array.isArray(
-          data?.courses
-        )
+        Array.isArray(data?.courses)
           ? data.courses
-          : Array.isArray(
-              data?.data
-            )
+          : Array.isArray(data?.data)
           ? data.data
           : []
       );
