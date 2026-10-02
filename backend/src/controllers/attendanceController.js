@@ -928,6 +928,306 @@ export const markFacultyAttendance =
         success: false,
         message:
           "Failed to save faculty attendance",
+      });
+    }
+  };
+
+/*
+|--------------------------------------------------------------------------
+| FACULTY - GET MY ATTENDANCE SUMMARY
+|--------------------------------------------------------------------------
+*/
+export const getMyFacultyAttendance =
+  async (req, res) => {
+    try {
+      const userId =
+        req.user?.userId;
+
+      const faculty =
+        await getFacultyFromUser(
+          userId
+        );
+
+      if (!faculty) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Faculty profile not found",
+        });
+      }
+
+      const courses =
+        await prisma.course.findMany({
+          where: {
+            facultyId:
+              faculty.id,
+          },
+
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            credits: true,
+          },
+
+          orderBy: {
+            name: "asc",
+          },
+        });
+
+      const courseIds =
+        courses.map(
+          (course) => course.id
+        );
+
+      if (courseIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+
+          summary: {
+            totalClasses: 0,
+            attendedClasses: 0,
+            absentClasses: 0,
+            lateClasses: 0,
+            attendancePercentage: 0,
+          },
+
+          records: [],
+        });
+      }
+
+      const records =
+        await prisma.attendanceRecord.findMany(
+          {
+            where: {
+              courseId: {
+                in: courseIds,
+              },
+            },
+
+            include: {
+              course: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  credits: true,
+                },
+              },
+
+              student: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
+            },
+
+            orderBy: {
+              date: "desc",
+            },
+          }
+        );
+
+      const totalClasses =
+        records.length;
+
+      const attendedClasses =
+        records.filter(
+          (record) =>
+            record.status === "PRESENT" ||
+            record.status === "LATE"
+        ).length;
+
+      const absentClasses =
+        records.filter(
+          (record) =>
+            record.status === "ABSENT"
+        ).length;
+
+      const lateClasses =
+        records.filter(
+          (record) =>
+            record.status === "LATE"
+        ).length;
+
+      const attendancePercentage =
+        totalClasses === 0
+          ? 0
+          : Number(
+              (
+                (attendedClasses /
+                  totalClasses) *
+                100
+              ).toFixed(1)
+            );
+
+      return res.status(200).json({
+        success: true,
+
+        faculty: {
+          id: faculty.id,
+          employeeId:
+            faculty.employeeId,
+        },
+
+        summary: {
+          totalClasses,
+          attendedClasses,
+          absentClasses,
+          lateClasses,
+          attendancePercentage,
+        },
+
+        records,
+      });
+    } catch (error) {
+      console.error(
+        "Get faculty attendance error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Failed to fetch faculty attendance",
+        error: error.message,
+      });
+    }
+  };
+
+/*
+|--------------------------------------------------------------------------
+| FACULTY - GET COURSE-WISE ATTENDANCE
+|--------------------------------------------------------------------------
+*/
+export const getMyFacultyCourseAttendance =
+  async (req, res) => {
+    try {
+      const userId =
+        req.user?.userId;
+
+      const faculty =
+        await getFacultyFromUser(
+          userId
+        );
+
+      if (!faculty) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Faculty profile not found",
+        });
+      }
+
+      const courses =
+        await prisma.course.findMany({
+          where: {
+            facultyId:
+              faculty.id,
+          },
+
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            credits: true,
+          },
+
+          orderBy: {
+            name: "asc",
+          },
+        });
+
+      const result =
+        await Promise.all(
+          courses.map(
+            async (course) => {
+              const records =
+                await prisma.attendanceRecord.findMany(
+                  {
+                    where: {
+                      courseId:
+                        course.id,
+                    },
+                  }
+                );
+
+              const totalClasses =
+                records.length;
+
+              const attendedClasses =
+                records.filter(
+                  (record) =>
+                    record.status ===
+                      "PRESENT" ||
+                    record.status ===
+                      "LATE"
+                ).length;
+
+              const absentClasses =
+                records.filter(
+                  (record) =>
+                    record.status ===
+                    "ABSENT"
+                ).length;
+
+              const lateClasses =
+                records.filter(
+                  (record) =>
+                    record.status ===
+                    "LATE"
+                ).length;
+
+              const percentage =
+                totalClasses === 0
+                  ? 0
+                  : Number(
+                      (
+                        (attendedClasses /
+                          totalClasses) *
+                        100
+                      ).toFixed(1)
+                    );
+
+              return {
+                course,
+
+                totalClasses,
+
+                attendedClasses,
+
+                absentClasses,
+
+                lateClasses,
+
+                percentage,
+              };
+            }
+          )
+        );
+
+      return res.status(200).json({
+        success: true,
+
+        courses: result,
+      });
+    } catch (error) {
+      console.error(
+        "Get faculty course attendance error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Failed to fetch faculty course attendance",
         error: error.message,
       });
     }
@@ -1191,17 +1491,6 @@ export const getMyCourseAttendance =
 |--------------------------------------------------------------------------
 | ADMIN - GET ATTENDANCE
 |--------------------------------------------------------------------------
-|
-| Supported query parameters:
-|
-| ?date=2026-09-12
-| ?courseId=1
-| ?facultyId=1
-| ?studentId=1
-|
-| Any combination can be used.
-|
-|--------------------------------------------------------------------------
 */
 export const getAdminAttendance = async (
   req,
@@ -1295,11 +1584,6 @@ export const getAdminAttendance = async (
       }
     }
 
-    /*
-     * ----------------------------------------------------------
-     * Find courses matching faculty/course filters
-     * ----------------------------------------------------------
-     */
     const courseWhere = {};
 
     if (parsedCourseId !== null) {
@@ -1336,11 +1620,6 @@ export const getAdminAttendance = async (
         (course) => course.id
       );
 
-    /*
-     * If course/faculty filtering gives no courses,
-     * return an empty result instead of querying
-     * unrelated attendance records.
-     */
     if (courseIds.length === 0) {
       return res.status(200).json({
         success: true,
@@ -1368,11 +1647,6 @@ export const getAdminAttendance = async (
       });
     }
 
-    /*
-     * ----------------------------------------------------------
-     * Build attendance query
-     * ----------------------------------------------------------
-     */
     const attendanceWhere = {
       courseId: {
         in: courseIds,
@@ -1435,11 +1709,6 @@ export const getAdminAttendance = async (
         }
       );
 
-    /*
-     * ----------------------------------------------------------
-     * Get faculty information
-     * ----------------------------------------------------------
-     */
     const facultyIds = [
       ...new Set(
         courses
@@ -1489,11 +1758,6 @@ export const getAdminAttendance = async (
         )
       );
 
-    /*
-     * ----------------------------------------------------------
-     * Calculate summary
-     * ----------------------------------------------------------
-     */
     const totalRecords =
       attendance.length;
 
@@ -1535,11 +1799,6 @@ export const getAdminAttendance = async (
             ).toFixed(1)
           );
 
-    /*
-     * ----------------------------------------------------------
-     * Format records for Admin Dashboard
-     * ----------------------------------------------------------
-     */
     const formattedRecords =
       attendance.map(
         (record) => {
@@ -1676,18 +1935,6 @@ export const getAdminAttendance = async (
 |--------------------------------------------------------------------------
 | ADMIN - GET ATTENDANCE SUMMARY
 |--------------------------------------------------------------------------
-|
-| Returns overall attendance statistics without requiring
-| the frontend to process every individual record.
-|
-| Supported query parameters:
-|
-| ?date=2026-09-12
-| ?courseId=1
-| ?facultyId=1
-| ?studentId=1
-|
-|--------------------------------------------------------------------------
 */
 export const getAdminAttendanceSummary =
   async (req, res) => {
@@ -1741,7 +1988,7 @@ export const getAdminAttendanceSummary =
         (!Number.isInteger(
           parsedFacultyId
         ) ||
-        parsedFacultyId <= 0)
+          parsedFacultyId <= 0)
       ) {
         return res.status(400).json({
           success: false,
@@ -1755,7 +2002,7 @@ export const getAdminAttendanceSummary =
         (!Number.isInteger(
           parsedStudentId
         ) ||
-        parsedStudentId <= 0)
+          parsedStudentId <= 0)
       ) {
         return res.status(400).json({
           success: false,
@@ -1919,6 +2166,8 @@ export default {
   markAttendance,
   getFacultyCourseAttendance,
   markFacultyAttendance,
+  getMyFacultyAttendance,
+  getMyFacultyCourseAttendance,
   getMyAttendance,
   getMyCourseAttendance,
   getAdminAttendance,
