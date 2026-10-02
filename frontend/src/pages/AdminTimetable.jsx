@@ -250,17 +250,22 @@ function Modal({
 
 export default function AdminTimetable() {
   const navigate = useNavigate();
+
   const [timetable, setTimetable] =
     useState([]);
+
   const [courses, setCourses] =
     useState([]);
+
   const [facultyList, setFacultyList] =
     useState([]);
 
   const [loading, setLoading] =
     useState(true);
+
   const [refreshing, setRefreshing] =
     useState(false);
+
   const [
     formDataLoading,
     setFormDataLoading,
@@ -268,20 +273,44 @@ export default function AdminTimetable() {
 
   const [search, setSearch] =
     useState("");
+
+  // ============================================================
+  // NEW ACADEMIC FILTERS
+  // ============================================================
+
+  const [
+    departmentFilter,
+    setDepartmentFilter,
+  ] = useState("ALL");
+
+  const [
+    programFilter,
+    setProgramFilter,
+  ] = useState("ALL");
+
+  const [
+    semesterFilter,
+    setSemesterFilter,
+  ] = useState("ALL");
+
   const [
     courseFilter,
     setCourseFilter,
   ] = useState("ALL");
+
   const [
     facultyFilter,
     setFacultyFilter,
   ] = useState("ALL");
+
   const [dayFilter, setDayFilter] =
     useState("ALL");
+
   const [
     classTypeFilter,
     setClassTypeFilter,
   ] = useState("ALL");
+
   const [
     batchFilter,
     setBatchFilter,
@@ -296,6 +325,7 @@ export default function AdminTimetable() {
     showAddModal,
     setShowAddModal,
   ] = useState(false);
+
   const [
     showEditModal,
     setShowEditModal,
@@ -303,8 +333,10 @@ export default function AdminTimetable() {
 
   const [formLoading, setFormLoading] =
     useState(false);
+
   const [formError, setFormError] =
     useState("");
+
   const [
     successMessage,
     setSuccessMessage,
@@ -351,6 +383,273 @@ export default function AdminTimetable() {
   }
 
   // ============================================================
+  // DERIVED DEPARTMENTS
+  // ============================================================
+
+  const departments = useMemo(() => {
+    const map = new Map();
+
+    courses.forEach((course) => {
+      const department =
+        course?.department;
+
+      if (
+        department?.id !== undefined &&
+        department?.id !== null
+      ) {
+        map.set(
+          String(department.id),
+          department
+        );
+      }
+    });
+
+    return Array.from(
+      map.values()
+    ).sort((a, b) =>
+      String(
+        a.name || a.code || ""
+      ).localeCompare(
+        String(
+          b.name || b.code || ""
+        )
+      )
+    );
+  }, [courses]);
+
+  // ============================================================
+  // DERIVED PROGRAMS
+  // ============================================================
+
+  const programs = useMemo(() => {
+    const map = new Map();
+
+    courses.forEach((course) => {
+      const program =
+        course?.program;
+
+      if (
+        program?.id === undefined ||
+        program?.id === null
+      ) {
+        return;
+      }
+
+      if (
+        departmentFilter !== "ALL" &&
+        String(
+          program.departmentId
+        ) !==
+          String(
+            departmentFilter
+          )
+      ) {
+        return;
+      }
+
+      map.set(
+        String(program.id),
+        program
+      );
+    });
+
+    return Array.from(
+      map.values()
+    ).sort((a, b) =>
+      String(
+        a.name || a.code || ""
+      ).localeCompare(
+        String(
+          b.name || b.code || ""
+        )
+      )
+    );
+  }, [
+    courses,
+    departmentFilter,
+  ]);
+
+  // ============================================================
+  // DERIVED SEMESTERS
+  // ============================================================
+
+  const semesters = useMemo(() => {
+    const values = new Set();
+
+    courses.forEach((course) => {
+      if (
+        departmentFilter !== "ALL" &&
+        String(
+          course?.departmentId ??
+            course?.department?.id
+        ) !==
+          String(
+            departmentFilter
+          )
+      ) {
+        return;
+      }
+
+      if (
+        programFilter !== "ALL" &&
+        String(
+          course?.programId ??
+            course?.program?.id
+        ) !==
+          String(programFilter)
+      ) {
+        return;
+      }
+
+      if (
+        course?.semester !==
+          undefined &&
+        course?.semester !==
+          null &&
+        course?.semester !== ""
+      ) {
+        values.add(
+          Number(course.semester)
+        );
+      }
+    });
+
+    return Array.from(values)
+      .filter(Number.isFinite)
+      .sort(
+        (a, b) => a - b
+      );
+  }, [
+    courses,
+    departmentFilter,
+    programFilter,
+  ]);
+
+  // ============================================================
+  // DERIVED COURSES
+  // ============================================================
+
+  const filteredCourses = useMemo(() => {
+    return courses
+      .filter((course) => {
+        if (
+          departmentFilter !==
+          "ALL"
+        ) {
+          const courseDepartmentId =
+            course?.departmentId ??
+            course?.department?.id;
+
+          if (
+            String(
+              courseDepartmentId
+            ) !==
+            String(
+              departmentFilter
+            )
+          ) {
+            return false;
+          }
+        }
+
+        if (
+          programFilter !==
+          "ALL"
+        ) {
+          const courseProgramId =
+            course?.programId ??
+            course?.program?.id;
+
+          if (
+            String(
+              courseProgramId
+            ) !==
+            String(programFilter)
+          ) {
+            return false;
+          }
+        }
+
+        if (
+          semesterFilter !==
+          "ALL"
+        ) {
+          if (
+            String(
+              course?.semester
+            ) !==
+            String(
+              semesterFilter
+            )
+          ) {
+            return false;
+          }
+        }
+
+        return true;
+      })
+      .sort((a, b) =>
+        String(
+          a.code || ""
+        ).localeCompare(
+          String(
+            b.code || ""
+          )
+        )
+      );
+  }, [
+    courses,
+    departmentFilter,
+    programFilter,
+    semesterFilter,
+  ]);
+
+  // ============================================================
+  // FILTER HANDLERS
+  // ============================================================
+
+  function handleDepartmentFilterChange(
+    event
+  ) {
+    const value =
+      event.target.value;
+
+    setDepartmentFilter(value);
+
+    // Department controls Program,
+    // Semester and Course.
+    setProgramFilter("ALL");
+    setSemesterFilter("ALL");
+    setCourseFilter("ALL");
+  }
+
+  function handleProgramFilterChange(
+    event
+  ) {
+    const value =
+      event.target.value;
+
+    setProgramFilter(value);
+
+    // Program controls Semester
+    // and Course.
+    setSemesterFilter("ALL");
+    setCourseFilter("ALL");
+  }
+
+  function handleSemesterFilterChange(
+    event
+  ) {
+    const value =
+      event.target.value;
+
+    setSemesterFilter(value);
+
+    // Semester controls Course.
+    setCourseFilter("ALL");
+  }
+
+  // ============================================================
   // LOAD TIMETABLE
   // ============================================================
 
@@ -376,6 +675,36 @@ export default function AdminTimetable() {
         );
       }
 
+      if (
+        departmentFilter !==
+        "ALL"
+      ) {
+        params.set(
+          "departmentId",
+          departmentFilter
+        );
+      }
+
+      if (
+        programFilter !==
+        "ALL"
+      ) {
+        params.set(
+          "programId",
+          programFilter
+        );
+      }
+
+      if (
+        semesterFilter !==
+        "ALL"
+      ) {
+        params.set(
+          "semester",
+          semesterFilter
+        );
+      }
+
       if (courseFilter !== "ALL") {
         params.set(
           "courseId",
@@ -383,7 +712,9 @@ export default function AdminTimetable() {
         );
       }
 
-      if (facultyFilter !== "ALL") {
+      if (
+        facultyFilter !== "ALL"
+      ) {
         params.set(
           "facultyId",
           facultyFilter
@@ -414,7 +745,10 @@ export default function AdminTimetable() {
           batchFilter ===
           "COMMON"
         ) {
-          params.set("batch", "");
+          params.set(
+            "batch",
+            ""
+          );
         } else {
           params.set(
             "batch",
@@ -427,7 +761,9 @@ export default function AdminTimetable() {
         params.toString();
 
       const endpoint = `/admin/timetable${
-        query ? `?${query}` : ""
+        query
+          ? `?${query}`
+          : ""
       }`;
 
       const data = await apiGet(
@@ -469,33 +805,34 @@ export default function AdminTimetable() {
   // LOAD COURSES
   // ============================================================
 
-  async function loadCourses() {
-    try {
-      const data = await apiGet("/courses");
 
-      setCourses(
-        Array.isArray(data?.courses)
-          ? data.courses
-          : Array.isArray(data?.data)
-          ? data.data
-          : []
-      );
-    } catch (error) {
-      console.error(
-        "Load timetable courses error:",
-        error
-      );
+async function loadCourses() {
+  try {
+    const data = await apiGet("/courses");
 
-      if (handleAuthError(error)) {
-        return;
-      }
+    setCourses(
+      Array.isArray(data?.courses)
+        ? data.courses
+        : Array.isArray(data?.data)
+        ? data.data
+        : []
+    );
+  } catch (error) {
+    console.error(
+      "Load timetable courses error:",
+      error
+    );
 
-      setFormError(
-        error.message ||
-          "Unable to load courses"
-      );
+    if (handleAuthError(error)) {
+      return;
     }
+
+    setFormError(
+      error.message ||
+        "Unable to load courses"
+    );
   }
+}
 
   // ============================================================
   // LOAD FACULTY
@@ -647,7 +984,8 @@ export default function AdminTimetable() {
       ),
 
       facultyId:
-        entry?.facultyId === null ||
+        entry?.facultyId ===
+          null ||
         entry?.facultyId ===
           undefined
           ? ""
@@ -665,18 +1003,22 @@ export default function AdminTimetable() {
       endTime:
         entry?.endTime || "",
 
-      room: entry?.room || "",
+      room:
+        entry?.room || "",
 
       classType:
         entry?.classType ||
         "Lecture",
 
       batch:
-        entry?.batch === null ||
+        entry?.batch ===
+          null ||
         entry?.batch ===
           undefined
           ? ""
-          : String(entry.batch),
+          : String(
+              entry.batch
+            ),
     });
 
     setShowEditModal(true);
@@ -1009,6 +1351,22 @@ export default function AdminTimetable() {
   }
 
   // ============================================================
+  // RESET FILTERS
+  // ============================================================
+
+  function resetFilters() {
+    setSearch("");
+    setDepartmentFilter("ALL");
+    setProgramFilter("ALL");
+    setSemesterFilter("ALL");
+    setCourseFilter("ALL");
+    setFacultyFilter("ALL");
+    setDayFilter("ALL");
+    setClassTypeFilter("ALL");
+    setBatchFilter("ALL");
+  }
+
+  // ============================================================
   // SORTED TIMETABLE
   // ============================================================
 
@@ -1208,42 +1566,52 @@ export default function AdminTimetable() {
             </p>
           </div>
 
-<div className="flex flex-wrap gap-3">
-  <button
-    type="button"
-    onClick={() => navigate("/admin/dashboard")}
-    className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-  >
-    <ArrowLeft size={18} />
-    Back to Dashboard
-  </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                navigate(
+                  "/admin/dashboard"
+                )
+              }
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
+            >
+              <ArrowLeft
+                size={18}
+              />
+              Back to Dashboard
+            </button>
 
-  <button
-    type="button"
-    onClick={() => loadTimetable(true)}
-    disabled={refreshing}
-    className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
-  >
-    <RefreshCw
-      size={18}
-      className={
-        refreshing
-          ? "animate-spin"
-          : ""
-      }
-    />
-    Refresh
-  </button>
+            <button
+              type="button"
+              onClick={() =>
+                loadTimetable(true)
+              }
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
+            >
+              <RefreshCw
+                size={18}
+                className={
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }
+              />
+              Refresh
+            </button>
 
-  <button
-    type="button"
-    onClick={openAddModal}
-    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 font-medium text-white shadow-sm transition hover:bg-blue-700"
-  >
-    <Plus size={18} />
-    Add Timetable Entry
-  </button>
-</div>
+            <button
+              type="button"
+              onClick={
+                openAddModal
+              }
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 font-medium text-white shadow-sm transition hover:bg-blue-700"
+            >
+              <Plus size={18} />
+              Add Timetable Entry
+            </button>
+          </div>
         </div>
 
         {/* ==================================================== */}
@@ -1429,6 +1797,198 @@ export default function AdminTimetable() {
             Schedule Filters
           </div>
 
+          {/* ================================================== */}
+          {/* ACADEMIC FILTERS */}
+          {/* ================================================== */}
+
+          <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            {/* Department */}
+            <div className="relative">
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                Department
+              </label>
+
+              <select
+                value={
+                  departmentFilter
+                }
+                onChange={
+                  handleDepartmentFilterChange
+                }
+                className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="ALL">
+                  All Departments
+                </option>
+
+                {departments.map(
+                  (department) => (
+                    <option
+                      key={
+                        department.id
+                      }
+                      value={
+                        department.id
+                      }
+                    >
+                      {department.code
+                        ? `${department.code} — `
+                        : ""}
+                      {department.name}
+                    </option>
+                  )
+                )}
+              </select>
+
+              <ChevronDown
+                size={18}
+                className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
+              />
+            </div>
+
+            {/* Program */}
+            <div className="relative">
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                Program
+              </label>
+
+              <select
+                value={
+                  programFilter
+                }
+                onChange={
+                  handleProgramFilterChange
+                }
+                disabled={
+                  departmentFilter ===
+                    "ALL" &&
+                  programs.length ===
+                    0
+                }
+                className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="ALL">
+                  All Programs
+                </option>
+
+                {programs.map(
+                  (program) => (
+                    <option
+                      key={
+                        program.id
+                      }
+                      value={
+                        program.id
+                      }
+                    >
+                      {program.code
+                        ? `${program.code} — `
+                        : ""}
+                      {program.name}
+                    </option>
+                  )
+                )}
+              </select>
+
+              <ChevronDown
+                size={18}
+                className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
+              />
+            </div>
+
+            {/* Semester */}
+            <div className="relative">
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                Semester
+              </label>
+
+              <select
+                value={
+                  semesterFilter
+                }
+                onChange={
+                  handleSemesterFilterChange
+                }
+                className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="ALL">
+                  All Semesters
+                </option>
+
+                {semesters.map(
+                  (semester) => (
+                    <option
+                      key={
+                        semester
+                      }
+                      value={
+                        semester
+                      }
+                    >
+                      Semester{" "}
+                      {semester}
+                    </option>
+                  )
+                )}
+              </select>
+
+              <ChevronDown
+                size={18}
+                className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
+              />
+            </div>
+
+            {/* Course */}
+            <div className="relative">
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                Course
+              </label>
+
+              <select
+                value={
+                  courseFilter
+                }
+                onChange={(event) =>
+                  setCourseFilter(
+                    event.target.value
+                  )
+                }
+                className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="ALL">
+                  All Courses
+                </option>
+
+                {filteredCourses.map(
+                  (course) => (
+                    <option
+                      key={
+                        course.id
+                      }
+                      value={
+                        course.id
+                      }
+                    >
+                      {course.code} —{" "}
+                      {
+                        course.name
+                      }
+                    </option>
+                  )
+                )}
+              </select>
+
+              <ChevronDown
+                size={18}
+                className="pointer-events-none absolute right-3 bottom-3 text-gray-400"
+              />
+            </div>
+          </div>
+
+          {/* ================================================== */}
+          {/* EXISTING FILTERS */}
+          {/* ================================================== */}
+
           <div className="grid gap-3 lg:grid-cols-3 xl:grid-cols-6">
             <div className="relative xl:col-span-2">
               <Search
@@ -1461,7 +2021,9 @@ export default function AdminTimetable() {
 
             <div className="relative">
               <select
-                value={batchFilter}
+                value={
+                  batchFilter
+                }
                 onChange={(event) =>
                   setBatchFilter(
                     event.target.value
@@ -1527,46 +2089,9 @@ export default function AdminTimetable() {
 
             <div className="relative">
               <select
-                value={courseFilter}
-                onChange={(event) =>
-                  setCourseFilter(
-                    event.target.value
-                  )
+                value={
+                  facultyFilter
                 }
-                className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="ALL">
-                  All Courses
-                </option>
-
-                {courses.map(
-                  (course) => (
-                    <option
-                      key={
-                        course.id
-                      }
-                      value={
-                        course.id
-                      }
-                    >
-                      {course.code} —{" "}
-                      {
-                        course.name
-                      }
-                    </option>
-                  )
-                )}
-              </select>
-
-              <ChevronDown
-                size={18}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-            </div>
-
-            <div className="relative">
-              <select
-                value={facultyFilter}
                 onChange={(event) =>
                   setFacultyFilter(
                     event.target.value
@@ -1655,7 +2180,21 @@ export default function AdminTimetable() {
             </div>
           </div>
 
-          <div className="mt-3 flex justify-end">
+          {/* ================================================== */}
+          {/* FILTER BUTTONS */}
+          {/* ================================================== */}
+
+          <div className="mt-4 flex flex-wrap justify-end gap-3">
+            <button
+              type="button"
+              onClick={
+                resetFilters
+              }
+              className="rounded-xl border border-gray-300 bg-white px-5 py-3 font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Reset Filters
+            </button>
+
             <button
               type="button"
               onClick={() =>
@@ -1931,6 +2470,46 @@ export default function AdminTimetable() {
                         ?.name ||
                         "-"}
                     </p>
+
+                    {selectedEntry
+                      .course
+                      ?.department && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Department:{" "}
+                        {selectedEntry
+                          .course
+                          .department
+                          .name ||
+                          "-"}
+                      </p>
+                    )}
+
+                    {selectedEntry
+                      .course
+                      ?.program && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Program:{" "}
+                        {selectedEntry
+                          .course
+                          .program
+                          .name ||
+                          "-"}
+                      </p>
+                    )}
+
+                    {selectedEntry
+                      .course
+                      ?.semester !==
+                      undefined && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Semester:{" "}
+                        {
+                          selectedEntry
+                            .course
+                            .semester
+                        }
+                      </p>
+                    )}
                   </div>
 
                   <div className="rounded-xl border bg-gray-50 p-4">
@@ -2177,10 +2756,11 @@ export default function AdminTimetable() {
                   onChange={
                     handleAddChange
                   }
+                  required
                   className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="">
-                    Not Assigned
+                    Select Faculty
                   </option>
 
                   {facultyList.map(
