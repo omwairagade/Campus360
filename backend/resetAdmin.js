@@ -1,4 +1,4 @@
-﻿import bcrypt from "bcrypt";
+import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import prisma from "./src/lib/prisma.js";
 
@@ -16,10 +16,7 @@ try {
     },
   });
 
-  if (!existingAdmin) {
-    console.log("Admin account was not found.");
-    process.exitCode = 1;
-  } else {
+  if (existingAdmin) {
     await prisma.user.update({
       where: {
         email,
@@ -35,12 +32,31 @@ try {
     console.log("=================================");
     console.log("ADMIN PASSWORD RESET SUCCESSFUL");
     console.log("=================================");
-    console.log("Email:", email);
-    console.log("Password:", password);
+  } else {
+    await prisma.user.create({
+      data: {
+        firstName: "System",
+        lastName: "Admin",
+        email,
+        passwordHash,
+        role: "ADMIN",
+        isActive: true,
+        mustChangePassword: false,
+      },
+    });
+
+    console.log("=================================");
+    console.log("ADMIN ACCOUNT CREATED SUCCESSFULLY");
+    console.log("=================================");
   }
+
+  console.log("Email:", email);
+  console.log("Password:", password);
+  console.log("Role: ADMIN");
 } catch (error) {
   console.error("ADMIN RESET ERROR:");
   console.error(error);
+  process.exitCode = 1;
 } finally {
   await prisma.$disconnect();
 }
