@@ -422,7 +422,6 @@ export const getAdminUserStats = async (
       totalStudents,
       totalFaculty,
       totalAdmins,
-      totalParents,
     ] = await Promise.all([
       prisma.user.count(),
 
@@ -455,18 +454,11 @@ export const getAdminUserStats = async (
           role: "ADMIN",
         },
       }),
-
-      prisma.user.count({
-        where: {
-          role: "PARENT",
-        },
-      }),
     ]);
 
     return res.status(200).json({
       success: true,
-      message:
-        "User statistics fetched successfully.",
+      message: "User statistics fetched successfully.",
       stats: {
         total: totalUsers,
         active: activeUsers,
@@ -476,7 +468,6 @@ export const getAdminUserStats = async (
           students: totalStudents,
           faculty: totalFaculty,
           admins: totalAdmins,
-          parents: totalParents,
         },
       },
     });
@@ -488,9 +479,7 @@ export const getAdminUserStats = async (
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch user statistics.",
-      error: error.message,
+      message: "Failed to fetch user statistics.",
     });
   }
 };
