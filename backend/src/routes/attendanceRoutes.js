@@ -4,6 +4,8 @@ import {
   markAttendance,
   getFacultyCourseAttendance,
   markFacultyAttendance,
+  getMyFacultyAttendance,
+  getMyFacultyCourseAttendance,
   getMyAttendance,
   getMyCourseAttendance,
   getAdminAttendance,
@@ -49,7 +51,35 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| STUDENT - GET MY ATTENDANCE
+| FACULTY - GET MY ATTENDANCE
+|--------------------------------------------------------------------------
+| Used by FacultyAttendance.jsx
+| GET /api/attendance/my-attendance
+|--------------------------------------------------------------------------
+*/
+router.get(
+  "/my-attendance",
+  authMiddleware,
+  getMyFacultyAttendance
+);
+
+/*
+|--------------------------------------------------------------------------
+| FACULTY - GET MY COURSE-WISE ATTENDANCE
+|--------------------------------------------------------------------------
+| Used by FacultyAttendance.jsx
+| GET /api/attendance/my-courses
+|--------------------------------------------------------------------------
+*/
+router.get(
+  "/my-courses",
+  authMiddleware,
+  getMyFacultyCourseAttendance
+);
+
+/*
+|--------------------------------------------------------------------------
+| STUDENT - GET LOGGED-IN ATTENDANCE
 |--------------------------------------------------------------------------
 */
 router.get(
@@ -60,7 +90,7 @@ router.get(
 
 /*
 |--------------------------------------------------------------------------
-| STUDENT - GET MY COURSE-WISE ATTENDANCE
+| STUDENT - GET COURSE-WISE ATTENDANCE
 |--------------------------------------------------------------------------
 */
 router.get(
