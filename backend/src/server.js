@@ -63,11 +63,42 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ===============================
-// Middleware
+// CORS Configuration
 // ===============================
-app.use(cors());
+const allowedOrigins = [
+  "https://campus360-frontend.onrender.com",
+  "http://localhost:5173",
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests without an Origin header
+      // such as server-to-server requests.
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(
+        new Error("CORS policy: Origin not allowed")
+      );
+    },
+    credentials: true,
+  })
+);
+
+// ===============================
+// Body Parser
+// ===============================
 app.use(express.json());
 
+// ===============================
+// Static Uploads
+// ===============================
 app.use(
   "/uploads",
   express.static(path.resolve(__dirname, "../uploads"))
@@ -112,6 +143,7 @@ app.use("/api/admin/reports", adminReportRoutes);
 app.use("/api/admin/results", adminResultRoutes);
 app.use("/api/admin/academic-years", adminAcademicYearRoutes);
 app.use("/api/admin/fee-structures", adminFeeStructureRoutes);
+
 app.use(
   "/api/admin/payment-settings",
   adminPaymentSettingRoutes
