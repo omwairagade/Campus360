@@ -81,8 +81,7 @@ export const createCourse = async (req, res) => {
     if (program.departmentId !== finalDepartmentId) {
       return res.status(400).json({
         success: false,
-        message:
-          "Program does not belong to the selected department",
+        message: "Program does not belong to the selected department",
       });
     }
 
@@ -107,8 +106,7 @@ export const createCourse = async (req, res) => {
       if (faculty.departmentId !== finalDepartmentId) {
         return res.status(400).json({
           success: false,
-          message:
-            "Faculty does not belong to the selected department",
+          message: "Faculty does not belong to the selected department",
         });
       }
     }
@@ -275,6 +273,86 @@ export const getMyCourses = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch your courses",
+    });
+  }
+};
+
+// =====================================================
+// GET AVAILABLE COURSES FOR LOGGED-IN STUDENT
+// =====================================================
+
+export const getAvailableCourses = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const student = await prisma.student.findUnique({
+      where: {
+        userId,
+      },
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student profile not found",
+      });
+    }
+
+    const courses = await prisma.course.findMany({
+      where: {
+        // Student and course must belong to the same department
+        departmentId: student.departmentId,
+
+        // Student and course must belong to the same program
+        programId: student.programId,
+
+        // Course must belong to student's current semester
+        semester: student.semester,
+
+        // Faculty must already be assigned
+        facultyId: {
+          not: null,
+        },
+
+        // Student must not already be enrolled
+        enrollments: {
+          none: {
+            studentId: student.id,
+          },
+        },
+      },
+
+      include: {
+        department: true,
+        program: true,
+        faculty: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      courses,
+    });
+  } catch (error) {
+    console.error("Get available courses error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch available courses",
     });
   }
 };
@@ -456,18 +534,14 @@ export const updateCourse = async (req, res) => {
     if (program.departmentId !== finalDepartmentId) {
       return res.status(400).json({
         success: false,
-        message:
-          "Program does not belong to the selected department",
+        message: "Program does not belong to the selected department",
       });
     }
 
     let finalFacultyId = existingCourse.facultyId;
 
     if (facultyId !== undefined) {
-      if (
-        facultyId === null ||
-        facultyId === ""
-      ) {
+      if (facultyId === null || facultyId === "") {
         finalFacultyId = null;
       } else {
         finalFacultyId = Number(facultyId);
@@ -488,8 +562,7 @@ export const updateCourse = async (req, res) => {
         if (faculty.departmentId !== finalDepartmentId) {
           return res.status(400).json({
             success: false,
-            message:
-              "Faculty does not belong to the selected department",
+            message: "Faculty does not belong to the selected department",
           });
         }
       }
@@ -606,8 +679,7 @@ export const deleteCourse = async (req, res) => {
       });
     }
 
-    const enrollmentCount =
-      existingCourse.enrollments?.length || 0;
+    const enrollmentCount = existingCourse.enrollments?.length || 0;
 
     if (enrollmentCount > 0) {
       return res.status(409).json({
@@ -636,10 +708,7 @@ export const deleteCourse = async (req, res) => {
      * This prevents accidental deletion when another
      * Campus360 module still depends on the course.
      */
-    if (
-      error?.code === "P2003" ||
-      error?.code === "P2014"
-    ) {
+    if (error?.code === "P2003" || error?.code === "P2014") {
       return res.status(409).json({
         success: false,
         message:
@@ -662,6 +731,7 @@ export default {
   createCourse,
   getCourses,
   getMyCourses,
+  getAvailableCourses,
   getCourseById,
   updateCourse,
   deleteCourse,

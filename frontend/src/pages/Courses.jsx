@@ -11,9 +11,15 @@ import {
   Search,
   UserRound,
   X,
+  Plus,
+  Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { apiGet, logoutUser } from "../api";
+import {
+  apiGet,
+  apiPost,
+  logoutUser,
+} from "../api";
 
 const getFacultyName = (faculty) => {
   if (!faculty?.user) return "Not Assigned";
@@ -106,7 +112,13 @@ const getErrorMessage = (error) => {
   );
 };
 
-function CourseCard({ course, onOpen }) {
+function CourseCard({
+  course,
+  onOpen,
+  onEnroll,
+  enrolling,
+  available = false,
+}) {
   const facultyName = getFacultyName(course.faculty);
 
   return (
@@ -170,7 +182,9 @@ function CourseCard({ course, onOpen }) {
           {course.faculty?.user?.email && (
             <a
               href={`mailto:${course.faculty.user.email}`}
-              onClick={(event) => event.stopPropagation()}
+              onClick={(event) =>
+                event.stopPropagation()
+              }
             >
               <Mail size={13} />
               {course.faculty.user.email}
@@ -179,45 +193,84 @@ function CourseCard({ course, onOpen }) {
         </div>
       </div>
 
-      <div className="course-progress">
-        <div className="progress-heading">
-          <span>Course Progress</span>
-          <strong>{course.progressPercent}%</strong>
-        </div>
+      {!available && (
+        <div className="course-progress">
+          <div className="progress-heading">
+            <span>Course Progress</span>
+            <strong>
+              {course.progressPercent}%
+            </strong>
+          </div>
 
-        <div className="progress-track">
-          <div
-            className={getProgressClass(
-              course.progressPercent
+          <div className="progress-track">
+            <div
+              className={getProgressClass(
+                course.progressPercent
+              )}
+              style={{
+                width: `${course.progressPercent}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {available ? (
+        <div className="course-card-footer available-footer">
+          <span className="available-course-label">
+            <CheckCircle2 size={13} />
+            Eligible for enrollment
+          </span>
+
+          <button
+            type="button"
+            className="enroll-course-btn"
+            onClick={() => onEnroll(course)}
+            disabled={enrolling}
+          >
+            {enrolling ? (
+              <>
+                <RefreshCw
+                  size={14}
+                  className="refresh-spin"
+                />
+                Enrolling...
+              </>
+            ) : (
+              <>
+                <Plus size={14} />
+                Enroll
+              </>
             )}
-            style={{
-              width: `${course.progressPercent}%`,
-            }}
-          />
+          </button>
         </div>
-      </div>
+      ) : (
+        <div className="course-card-footer">
+          <span className="enrolled-date">
+            Enrolled {formatDate(course.enrolledAt)}
+          </span>
 
-      <div className="course-card-footer">
-        <span className="enrolled-date">
-          Enrolled {formatDate(course.enrolledAt)}
-        </span>
-
-        <button
-          type="button"
-          className="view-course-btn"
-          onClick={() => onOpen(course)}
-        >
-          View Details
-        </button>
-      </div>
+          <button
+            type="button"
+            className="view-course-btn"
+            onClick={() => onOpen(course)}
+          >
+            View Details
+          </button>
+        </div>
+      )}
     </article>
   );
 }
 
-function CourseDetailsModal({ course, onClose }) {
+function CourseDetailsModal({
+  course,
+  onClose,
+}) {
   if (!course) return null;
 
   const facultyName = getFacultyName(course.faculty);
+  const isAvailable = !course.enrollmentId;
 
   return (
     <div
@@ -238,7 +291,11 @@ function CourseDetailsModal({ course, onClose }) {
 
             <h2>{course.name}</h2>
 
-            <span className={getCourseTypeClass(course.type)}>
+            <span
+              className={getCourseTypeClass(
+                course.type
+              )}
+            >
               {course.type}
             </span>
           </div>
@@ -312,36 +369,54 @@ function CourseDetailsModal({ course, onClose }) {
             </div>
           </div>
 
-          <div className="modal-progress">
-            <div className="progress-heading">
-              <span>Course Progress</span>
-              <strong>
-                {course.progressPercent}%
-              </strong>
+          {!isAvailable && (
+            <>
+              <div className="modal-progress">
+                <div className="progress-heading">
+                  <span>Course Progress</span>
+
+                  <strong>
+                    {course.progressPercent}%
+                  </strong>
+                </div>
+
+                <div className="progress-track large">
+                  <div
+                    className={getProgressClass(
+                      course.progressPercent
+                    )}
+                    style={{
+                      width: `${course.progressPercent}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-enrollment">
+                <CalendarDays size={17} />
+
+                <span>
+                  Enrolled on{" "}
+                  <strong>
+                    {formatDate(
+                      course.enrolledAt
+                    )}
+                  </strong>
+                </span>
+              </div>
+            </>
+          )}
+
+          {isAvailable && (
+            <div className="available-modal-note">
+              <CheckCircle2 size={17} />
+
+              <span>
+                You are eligible to enroll in this
+                course.
+              </span>
             </div>
-
-            <div className="progress-track large">
-              <div
-                className={getProgressClass(
-                  course.progressPercent
-                )}
-                style={{
-                  width: `${course.progressPercent}%`,
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="modal-enrollment">
-            <CalendarDays size={17} />
-
-            <span>
-              Enrolled on{" "}
-              <strong>
-                {formatDate(course.enrolledAt)}
-              </strong>
-            </span>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -352,15 +427,31 @@ export default function Courses() {
   const navigate = useNavigate();
 
   const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
+  const [availableCourses, setAvailableCourses] =
+    useState([]);
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [enrollingCourseId, setEnrollingCourseId] =
+    useState(null);
+
+  const [error, setError] = useState("");
+  const [enrollmentMessage, setEnrollmentMessage] =
+    useState("");
+
+  const [searchTerm, setSearchTerm] =
+    useState("");
+
   const [semesterFilter, setSemesterFilter] =
     useState("all");
+
   const [typeFilter, setTypeFilter] =
     useState("all");
+
+  const [activeSection, setActiveSection] =
+    useState("enrolled");
 
   const [selectedCourse, setSelectedCourse] =
     useState(null);
@@ -368,6 +459,7 @@ export default function Courses() {
   const loadCourses = async (isRefresh = false) => {
     try {
       setError("");
+      setEnrollmentMessage("");
 
       if (isRefresh) {
         setRefreshing(true);
@@ -375,19 +467,32 @@ export default function Courses() {
         setLoading(true);
       }
 
-      const response = await apiGet(
-        "/courses/my-courses"
-      );
+      const [
+        enrolledResponse,
+        availableResponse,
+      ] = await Promise.all([
+        apiGet("/courses/my-courses"),
+        apiGet("/courses/available"),
+      ]);
 
-      const receivedCourses = getResponseCourses(
-        response
-      )
-        .map(normalizeCourse)
-        .filter(
-          (course) => course.id !== undefined
-        );
+      const receivedCourses =
+        getResponseCourses(enrolledResponse)
+          .map(normalizeCourse)
+          .filter(
+            (course) => course.id !== undefined
+          );
+
+      const receivedAvailableCourses =
+        getResponseCourses(availableResponse)
+          .map(normalizeCourse)
+          .filter(
+            (course) => course.id !== undefined
+          );
 
       setCourses(receivedCourses);
+      setAvailableCourses(
+        receivedAvailableCourses
+      );
     } catch (err) {
       console.error(
         "Load student courses error:",
@@ -418,8 +523,60 @@ export default function Courses() {
     loadCourses();
   }, []);
 
+  const handleEnroll = async (course) => {
+    if (!course?.id) return;
+
+    try {
+      setError("");
+      setEnrollmentMessage("");
+      setEnrollingCourseId(course.id);
+
+      const response = await apiPost(
+        "/enrollments",
+        {
+          courseId: course.id,
+        }
+      );
+
+      setEnrollmentMessage(
+        response?.message ||
+          response?.data?.message ||
+          `${course.name} enrolled successfully.`
+      );
+
+      setActiveSection("enrolled");
+
+      await loadCourses(true);
+    } catch (err) {
+      console.error(
+        "Enroll course error:",
+        err
+      );
+
+      const message = getErrorMessage(err);
+
+      const authError =
+        /token|authentication|unauthorized|forbidden|401|403/i.test(
+          message
+        );
+
+      if (authError) {
+        logoutUser();
+        navigate("/");
+        return;
+      }
+
+      setError(message);
+    } finally {
+      setEnrollingCourseId(null);
+    }
+  };
+
   const semesterOptions = useMemo(() => {
-    const values = courses
+    const values = [
+      ...courses,
+      ...availableCourses,
+    ]
       .map((course) => String(course.semester))
       .filter(Boolean);
 
@@ -428,22 +585,29 @@ export default function Courses() {
         numeric: true,
       })
     );
-  }, [courses]);
+  }, [courses, availableCourses]);
 
   const typeOptions = useMemo(() => {
-    const values = courses
+    const values = [
+      ...courses,
+      ...availableCourses,
+    ]
       .map((course) => String(course.type))
       .filter(Boolean);
 
     return [...new Set(values)].sort((a, b) =>
       a.localeCompare(b)
     );
-  }, [courses]);
+  }, [courses, availableCourses]);
 
-  const filteredCourses = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
+  const filterCourses = (
+    courseList
+  ) => {
+    const query = searchTerm
+      .trim()
+      .toLowerCase();
 
-    return courses.filter((course) => {
+    return courseList.filter((course) => {
       const matchesSearch =
         !query ||
         course.name
@@ -480,18 +644,38 @@ export default function Courses() {
         matchesType
       );
     });
-  }, [
-    courses,
-    searchTerm,
-    semesterFilter,
-    typeFilter,
-  ]);
+  };
+
+  const filteredCourses = useMemo(
+    () => filterCourses(courses),
+    [
+      courses,
+      searchTerm,
+      semesterFilter,
+      typeFilter,
+    ]
+  );
+
+  const filteredAvailableCourses =
+    useMemo(
+      () =>
+        filterCourses(
+          availableCourses
+        ),
+      [
+        availableCourses,
+        searchTerm,
+        semesterFilter,
+        typeFilter,
+      ]
+    );
 
   const totalCredits = useMemo(
     () =>
       courses.reduce(
         (total, course) =>
-          total + Number(course.credits || 0),
+          total +
+          Number(course.credits || 0),
         0
       ),
     [courses]
@@ -503,16 +687,22 @@ export default function Courses() {
     const total = courses.reduce(
       (sum, course) =>
         sum +
-        Number(course.progressPercent || 0),
+        Number(
+          course.progressPercent || 0
+        ),
       0
     );
 
-    return Math.round(total / courses.length);
+    return Math.round(
+      total / courses.length
+    );
   }, [courses]);
 
-  const completedCourses = courses.filter(
-    (course) => course.progressPercent >= 100
-  ).length;
+  const completedCourses =
+    courses.filter(
+      (course) =>
+        course.progressPercent >= 100
+    ).length;
 
   const activeCourses =
     courses.length - completedCourses;
@@ -652,6 +842,59 @@ export default function Courses() {
           line-height: 1;
         }
 
+        .course-tabs {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 18px;
+          background: #ffffff;
+          border: 1px solid #e6eaf0;
+          border-radius: 13px;
+          padding: 6px;
+          width: fit-content;
+        }
+
+        .course-tab {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          border: 0;
+          background: transparent;
+          color: #687386;
+          padding: 10px 15px;
+          border-radius: 9px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: 0.2s ease;
+        }
+
+        .course-tab:hover {
+          color: #2463c5;
+        }
+
+        .course-tab.active {
+          background: #172033;
+          color: #ffffff;
+        }
+
+        .course-tab-count {
+          min-width: 20px;
+          height: 20px;
+          padding: 0 6px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 20px;
+          background: #eef2f7;
+          color: #59667a;
+          font-size: 10px;
+        }
+
+        .course-tab.active .course-tab-count {
+          background: rgba(255,255,255,0.16);
+          color: #ffffff;
+        }
+
         .courses-toolbar {
           display: grid;
           grid-template-columns: minmax(260px, 1fr) 180px 180px;
@@ -715,6 +958,20 @@ export default function Courses() {
           padding: 14px 16px;
           margin-bottom: 20px;
           font-size: 13px;
+        }
+
+        .success-box {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          background: #edf9f2;
+          border: 1px solid #c7e9d3;
+          color: #267345;
+          border-radius: 12px;
+          padding: 13px 16px;
+          margin-bottom: 20px;
+          font-size: 13px;
+          font-weight: 600;
         }
 
         .retry-btn {
@@ -993,6 +1250,19 @@ export default function Courses() {
           border-top: 1px solid #edf0f4;
         }
 
+        .available-footer {
+          align-items: center;
+        }
+
+        .available-course-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          color: #2b8057;
+          font-size: 10px;
+          font-weight: 650;
+        }
+
         .enrolled-date {
           color: #8a94a4;
           font-size: 10px;
@@ -1011,6 +1281,33 @@ export default function Courses() {
 
         .view-course-btn:hover {
           background: #27344b;
+        }
+
+        .enroll-course-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+          border: 0;
+          background: #2463c5;
+          color: #ffffff;
+          border-radius: 8px;
+          padding: 9px 13px;
+          font-size: 11px;
+          font-weight: 750;
+          cursor: pointer;
+          transition: 0.2s ease;
+        }
+
+        .enroll-course-btn:hover {
+          background: #1d55aa;
+          transform: translateY(-1px);
+        }
+
+        .enroll-course-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.65;
+          transform: none;
         }
 
         .empty-courses {
@@ -1041,6 +1338,20 @@ export default function Courses() {
           margin: 0;
           color: #7c8798;
           font-size: 13px;
+        }
+
+        .available-modal-note {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 20px;
+          padding: 13px 15px;
+          background: #edf9f2;
+          border: 1px solid #c7e9d3;
+          border-radius: 10px;
+          color: #267345;
+          font-size: 12px;
+          font-weight: 600;
         }
 
         .course-modal-overlay {
@@ -1214,6 +1525,16 @@ export default function Courses() {
             font-size: 18px;
           }
 
+          .course-tabs {
+            width: 100%;
+          }
+
+          .course-tab {
+            flex: 1;
+            justify-content: center;
+            padding: 9px 8px;
+          }
+
           .courses-toolbar {
             grid-template-columns: 1fr;
           }
@@ -1244,6 +1565,16 @@ export default function Courses() {
           .course-name {
             min-height: auto;
           }
+
+          .course-card-footer {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .enroll-course-btn,
+          .view-course-btn {
+            width: 100%;
+          }
         }
       `}</style>
 
@@ -1255,7 +1586,9 @@ export default function Courses() {
             <button
               type="button"
               className="back-dashboard-btn"
-              onClick={() => navigate("/dashboard")}
+              onClick={() =>
+                navigate("/dashboard")
+              }
             >
               <ArrowLeft size={16} />
               Back to Dashboard
@@ -1265,8 +1598,8 @@ export default function Courses() {
               <h1>My Courses</h1>
 
               <p>
-                View your enrolled courses, faculty,
-                credits and academic progress.
+                View your enrolled courses and
+                enroll in eligible subjects.
               </p>
             </div>
           </div>
@@ -1274,8 +1607,12 @@ export default function Courses() {
           <button
             type="button"
             className="refresh-courses-btn"
-            onClick={() => loadCourses(true)}
-            disabled={loading || refreshing}
+            onClick={() =>
+              loadCourses(true)
+            }
+            disabled={
+              loading || refreshing
+            }
           >
             <RefreshCw
               size={16}
@@ -1300,10 +1637,22 @@ export default function Courses() {
             <button
               type="button"
               className="retry-btn"
-              onClick={() => loadCourses()}
+              onClick={() =>
+                loadCourses()
+              }
             >
               Retry
             </button>
+          </div>
+        )}
+
+        {/* SUCCESS */}
+        {enrollmentMessage && (
+          <div className="success-box">
+            <CheckCircle2 size={17} />
+            <span>
+              {enrollmentMessage}
+            </span>
           </div>
         )}
 
@@ -1316,7 +1665,9 @@ export default function Courses() {
 
             <div className="summary-text">
               <span>Total Courses</span>
-              <strong>{courses.length}</strong>
+              <strong>
+                {courses.length}
+              </strong>
             </div>
           </div>
 
@@ -1327,7 +1678,9 @@ export default function Courses() {
 
             <div className="summary-text">
               <span>Total Credits</span>
-              <strong>{totalCredits}</strong>
+              <strong>
+                {totalCredits}
+              </strong>
             </div>
           </div>
 
@@ -1338,7 +1691,9 @@ export default function Courses() {
 
             <div className="summary-text">
               <span>Active Courses</span>
-              <strong>{activeCourses}</strong>
+              <strong>
+                {activeCourses}
+              </strong>
             </div>
           </div>
 
@@ -1348,10 +1703,51 @@ export default function Courses() {
             </div>
 
             <div className="summary-text">
-              <span>Average Progress</span>
-              <strong>{averageProgress}%</strong>
+              <span>Available</span>
+              <strong>
+                {availableCourses.length}
+              </strong>
             </div>
           </div>
+        </div>
+
+        {/* COURSE TABS */}
+        <div className="course-tabs">
+          <button
+            type="button"
+            className={`course-tab ${
+              activeSection === "enrolled"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              setActiveSection("enrolled")
+            }
+          >
+            <BookOpen size={15} />
+            My Courses
+            <span className="course-tab-count">
+              {courses.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={`course-tab ${
+              activeSection === "available"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              setActiveSection("available")
+            }
+          >
+            <Plus size={15} />
+            Available Courses
+            <span className="course-tab-count">
+              {availableCourses.length}
+            </span>
+          </button>
         </div>
 
         {/* FILTERS */}
@@ -1420,70 +1816,161 @@ export default function Courses() {
           </select>
         </div>
 
-        {/* RESULT HEADER */}
-        <div className="courses-result-heading">
-          <h2>Your Enrolled Courses</h2>
+        {/* ENROLLED COURSES */}
+        {activeSection === "enrolled" && (
+          <>
+            <div className="courses-result-heading">
+              <h2>
+                Your Enrolled Courses
+              </h2>
 
-          <span>
-            Showing {filteredCourses.length} of{" "}
-            {courses.length}
-          </span>
-        </div>
-
-        {/* CONTENT */}
-        {loading ? (
-          <div className="empty-courses">
-            <div className="empty-courses-icon">
-              <RefreshCw
-                size={24}
-                className="refresh-spin"
-              />
+              <span>
+                Showing{" "}
+                {filteredCourses.length} of{" "}
+                {courses.length}
+              </span>
             </div>
 
-            <h3>
-              Loading your courses...
-            </h3>
+            {loading ? (
+              <div className="empty-courses">
+                <div className="empty-courses-icon">
+                  <RefreshCw
+                    size={24}
+                    className="refresh-spin"
+                  />
+                </div>
 
-            <p>
-              Please wait while we fetch your
-              enrolled courses.
-            </p>
-          </div>
-        ) : filteredCourses.length === 0 ? (
-          <div className="empty-courses">
-            <div className="empty-courses-icon">
-              <BookOpen size={25} />
-            </div>
+                <h3>
+                  Loading your courses...
+                </h3>
 
-            <h3>
-              {courses.length === 0
-                ? "No courses found"
-                : "No matching courses"}
-            </h3>
+                <p>
+                  Please wait while we fetch
+                  your enrolled courses.
+                </p>
+              </div>
+            ) : filteredCourses.length ===
+              0 ? (
+              <div className="empty-courses">
+                <div className="empty-courses-icon">
+                  <BookOpen size={25} />
+                </div>
 
-            <p>
-              {courses.length === 0
-                ? "You currently do not have any enrolled courses."
-                : "Try changing your search or filter options."}
-            </p>
-          </div>
-        ) : (
-          <div className="course-grid">
-            {filteredCourses.map(
-              (course) => (
-                <CourseCard
-                  key={
-                    course.enrollmentId ||
-                    course.id
-                  }
-                  course={course}
-                  onOpen={
-                    setSelectedCourse
-                  }
-                />
-              )
+                <h3>
+                  {courses.length === 0
+                    ? "No enrolled courses"
+                    : "No matching courses"}
+                </h3>
+
+                <p>
+                  {courses.length === 0
+                    ? "Open Available Courses to enroll in your eligible subjects."
+                    : "Try changing your search or filter options."}
+                </p>
+              </div>
+            ) : (
+              <div className="course-grid">
+                {filteredCourses.map(
+                  (course) => (
+                    <CourseCard
+                      key={
+                        course.enrollmentId ||
+                        course.id
+                      }
+                      course={course}
+                      onOpen={
+                        setSelectedCourse
+                      }
+                      available={false}
+                      enrolling={false}
+                      onEnroll={() => {}}
+                    />
+                  )
+                )}
+              </div>
             )}
-          </div>
+          </>
+        )}
+
+        {/* AVAILABLE COURSES */}
+        {activeSection === "available" && (
+          <>
+            <div className="courses-result-heading">
+              <h2>
+                Available Courses
+              </h2>
+
+              <span>
+                Showing{" "}
+                {
+                  filteredAvailableCourses.length
+                }{" "}
+                of{" "}
+                {availableCourses.length}
+              </span>
+            </div>
+
+            {loading ? (
+              <div className="empty-courses">
+                <div className="empty-courses-icon">
+                  <RefreshCw
+                    size={24}
+                    className="refresh-spin"
+                  />
+                </div>
+
+                <h3>
+                  Loading available courses...
+                </h3>
+
+                <p>
+                  Please wait while we find
+                  subjects available for you.
+                </p>
+              </div>
+            ) : filteredAvailableCourses.length ===
+              0 ? (
+              <div className="empty-courses">
+                <div className="empty-courses-icon">
+                  <Users size={25} />
+                </div>
+
+                <h3>
+                  No courses available
+                </h3>
+
+                <p>
+                  There are currently no eligible
+                  courses available for enrollment.
+                  Courses must match your program,
+                  department and semester and have
+                  a faculty assigned.
+                </p>
+              </div>
+            ) : (
+              <div className="course-grid">
+                {filteredAvailableCourses.map(
+                  (course) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      onOpen={
+                        setSelectedCourse
+                      }
+                      onEnroll={
+                        handleEnroll
+                      }
+                      enrolling={
+                        enrollingCourseId ===
+                        course.id
+                      }
+                      available={true}
+                    />
+                  )
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
